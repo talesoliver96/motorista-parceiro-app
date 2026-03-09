@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Alert,
   Button,
+  Chip,
   Grid,
   Stack,
   TextField,
@@ -16,7 +17,7 @@ import { profileService } from "../features/auth/profile.service";
 import { authService } from "../features/auth/auth.service";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
-import { getPremiumDescription, isPremiumProfile } from "../features/premium/premium.utils";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 
 const settingsSchema = z
   .object({
@@ -163,8 +164,19 @@ export function SettingsPage() {
         </Stack>
 
         <Alert severity={isPremium ? "success" : "info"}>
-          {getPremiumDescription(profile)}
+          Status da conta: {isPremium ? "Premium" : "Free"}
         </Alert>
+
+        <AppCard>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Plano atual</Typography>
+            <Chip
+              label={isPremium ? "Premium" : "Free"}
+              color={isPremium ? "success" : "default"}
+              variant={isPremium ? "filled" : "outlined"}
+            />
+          </Stack>
+        </AppCard>
 
         <AppCard>
           <Stack

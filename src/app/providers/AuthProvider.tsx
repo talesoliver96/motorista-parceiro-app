@@ -3,12 +3,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { authService } from "../../features/auth/auth.service";
 import { profileService } from "../../features/auth/profile.service";
 import type { Profile } from "../../types/database";
+import {
+  clearSupabaseBrowserStorage,
+  isSupabaseLockError,
+} from "../../features/auth/auth.utils";
 
 type AuthContextType = {
   user: User | null;
@@ -29,6 +34,9 @@ export function AuthProvider({ children }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Evita loop infinito de limpeza caso algo muito estranho aconteça.
+  const hasRecoveredLockRef = useRef(false);
 
   const refreshProfile = async () => {
     try {
@@ -51,15 +59,43 @@ export function AuthProvider({ children }: Props) {
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-        setLoading(false);
 
         if (currentSession?.user) {
           await refreshProfile();
         } else {
           setProfile(null);
         }
+
+        setLoading(false);
       } catch (error) {
         console.error("Erro ao iniciar autenticação:", error);
+
+        // Recuperação automática de lock/session quebrada do Supabase.
+        if (isSupabaseLockError(error) && !hasRecoveredLockRef.current) {
+          hasRecoveredLockRef.current = true;
+
+          clearSupabaseBrowserStorage();
+
+          try {
+            const retriedSession = await authService.getSession();
+
+            if (!isMounted) return;
+
+            setSession(retriedSession);
+            setUser(retriedSession?.user ?? null);
+
+            if (retriedSession?.user) {
+              await refreshProfile();
+            } else {
+              setProfile(null);
+            }
+
+            setLoading(false);
+            return;
+          } catch (retryError) {
+            console.error("Falha ao recuperar autenticação:", retryError);
+          }
+        }
 
         if (!isMounted) return;
 
@@ -78,13 +114,14 @@ export function AuthProvider({ children }: Props) {
 
         setSession(nextSession);
         setUser(nextSession?.user ?? null);
-        setLoading(false);
 
         if (nextSession?.user) {
           await refreshProfile();
         } else {
           setProfile(null);
         }
+
+        setLoading(false);
       }
     );
 

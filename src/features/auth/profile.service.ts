@@ -17,12 +17,19 @@ export const profileService = {
   },
 
   async updateMyProfile(values: { phone: string }) {
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id;
+
+    if (!userId) {
+      throw new Error("Usuário não autenticado");
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({
         phone: values.phone,
       })
-      .eq("id", (await supabase.auth.getUser()).data.user?.id);
+      .eq("id", userId);
 
     if (error) throw error;
   },
