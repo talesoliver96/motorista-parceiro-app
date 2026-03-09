@@ -19,6 +19,7 @@ import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import MailOutlineRoundedIcon from "@mui/icons-material/MailOutlineRounded";
+import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
@@ -36,6 +37,11 @@ const navItems = [
     path: "/reports",
     icon: <InsightsRoundedIcon />,
     premium: true,
+  },
+  {
+    label: "Admin",
+    path: "/admin/users",
+    icon: <AdminPanelSettingsRoundedIcon />,
   },
 ];
 

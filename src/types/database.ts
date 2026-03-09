@@ -7,6 +7,7 @@ export type Profile = {
   premium: boolean;
   premium_forever: boolean;
   premium_until: string | null;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 };

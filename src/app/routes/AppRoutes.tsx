@@ -11,6 +11,7 @@ import { ReportsPage } from "../../pages/ReportsPage";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicOnlyRoute } from "./PublicOnlyRoute";
+import { AdminUsersPage } from "../../pages/AdminUsersPage";
 
 export function AppRoutes() {
   return (
@@ -96,6 +97,17 @@ export function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <ReportsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AdminUsersPage />
             </AppLayout>
           </ProtectedRoute>
         }

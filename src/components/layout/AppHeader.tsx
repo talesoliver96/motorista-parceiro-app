@@ -26,6 +26,7 @@ const pageTitleMap: Record<string, string> = {
   "/reports": "Relatórios",
   "/settings": "Configurações",
   "/contact": "Contato",
+  "/admin/users": "Administração de usuários",
 };
 
 export function AppHeader({ onOpenMobileMenu }: Props) {
