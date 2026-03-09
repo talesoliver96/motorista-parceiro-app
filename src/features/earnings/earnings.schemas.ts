@@ -3,6 +3,7 @@ import { z } from "zod";
 const optionalNumber = z.preprocess(
   (value) => {
     if (value === "" || value === null || value === undefined) return undefined;
+
     const num = Number(value);
     return Number.isNaN(num) ? undefined : num;
   },
@@ -25,4 +26,4 @@ export const earningSchema = z.object({
   notes: z.string().optional(),
 });
 
-export type EarningFormData = z.infer<typeof earningSchema>;
+export type EarningFormValues = z.infer<typeof earningSchema>;

@@ -30,8 +30,6 @@ export function AuthProvider({ children }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Busca o perfil do usuário logado.
-  // Nunca deixa erro quebrar o app.
   const refreshProfile = async () => {
     try {
       const nextProfile = await profileService.getMyProfile();
@@ -53,13 +51,10 @@ export function AuthProvider({ children }: Props) {
 
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
-
-        // Libera a aplicação imediatamente após descobrir a sessão.
-        // O profile pode carregar depois, sem travar a interface.
         setLoading(false);
 
         if (currentSession?.user) {
-          refreshProfile();
+          await refreshProfile();
         } else {
           setProfile(null);
         }
@@ -77,19 +72,21 @@ export function AuthProvider({ children }: Props) {
 
     bootstrap();
 
-    const { data } = authService.onAuthStateChange((_event, nextSession) => {
-      if (!isMounted) return;
+    const { data } = authService.onAuthStateChange(
+      async (_event, nextSession): Promise<void> => {
+        if (!isMounted) return;
 
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      setLoading(false);
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+        setLoading(false);
 
-      if (nextSession?.user) {
-        refreshProfile();
-      } else {
-        setProfile(null);
+        if (nextSession?.user) {
+          await refreshProfile();
+        } else {
+          setProfile(null);
+        }
       }
-    });
+    );
 
     return () => {
       isMounted = false;

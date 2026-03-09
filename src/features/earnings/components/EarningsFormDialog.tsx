@@ -14,7 +14,7 @@ import { CurrencyField } from "../../../components/common/CurrencyField";
 import type { Earning } from "../../../types/database";
 import {
   earningSchema,
-  type EarningFormData,
+  type EarningFormValues,
 } from "../earnings.schemas";
 
 type Props = {
@@ -22,7 +22,7 @@ type Props = {
   loading?: boolean;
   initialData?: Earning | null;
   onClose: () => void;
-  onSubmit: (values: EarningFormData) => Promise<void>;
+  onSubmit: (values: EarningFormValues) => Promise<void>;
 };
 
 function toInputValue(value: number | null | undefined) {
@@ -58,7 +58,7 @@ export function EarningsFormDialog({
     reset,
     watch,
     formState: { errors },
-  } = useForm<EarningFormData>({
+  } = useForm<EarningFormValues>({
     resolver: zodResolver(earningSchema),
     defaultValues: {
       date: "",

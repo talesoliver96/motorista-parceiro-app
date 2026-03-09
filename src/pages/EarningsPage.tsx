@@ -8,7 +8,7 @@ import { EarningsToolbar } from "../features/earnings/components/EarningsToolbar
 import { EarningsTable } from "../features/earnings/components/EarningsTable";
 import { EarningsFormDialog } from "../features/earnings/components/EarningsFormDialog";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
-import type { EarningFormData } from "../features/earnings/earnings.schemas";
+import type { EarningFormValues } from "../features/earnings/earnings.schemas";
 import {
   formatCurrency,
   getCurrentMonthRange,
@@ -84,7 +84,7 @@ export function EarningsPage() {
     setDeleteOpen(true);
   };
 
-  const handleSubmit = async (values: EarningFormData) => {
+  const handleSubmit = async (values: EarningFormValues) => {
     if (!user) return;
 
     try {
