@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
-import type { Earning, Expense } from "../../types/database";
+import type { Earning } from "../../types/database";
+import type { ExpenseListItem } from "../expenses/expenses.types";
 
 export type EarningsChartPoint = {
   date: string;
@@ -10,7 +11,7 @@ export function sumGross(earnings: Earning[]) {
   return earnings.reduce((acc, item) => acc + Number(item.gross_amount || 0), 0);
 }
 
-export function sumExpenses(expenses: Expense[]) {
+export function sumExpenses(expenses: ExpenseListItem[]) {
   return expenses.reduce((acc, item) => acc + Number(item.amount || 0), 0);
 }
 
@@ -60,7 +61,7 @@ export function calculateProjection(
 
 export function getRecentActivity(
   earnings: Earning[],
-  expenses: Expense[]
+  expenses: ExpenseListItem[]
 ): Array<{
   id: string;
   type: "earning" | "expense";
@@ -79,7 +80,10 @@ export function getRecentActivity(
   const expenseItems = expenses.map((item) => ({
     id: item.id,
     type: "expense" as const,
-    title: item.category,
+    title:
+      item.source === "automatic_fuel"
+        ? "Combustível automático"
+        : item.category,
     date: item.date,
     amount: item.amount,
   }));

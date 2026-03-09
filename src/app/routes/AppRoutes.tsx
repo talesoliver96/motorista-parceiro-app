@@ -7,7 +7,7 @@ import { EarningsPage } from "../../pages/EarningsPage";
 import { ExpensesPage } from "../../pages/ExpensesPage";
 import { SettingsPage } from "../../pages/SettingsPage";
 import { ContactPage } from "../../pages/ContactPage";
-import { PlaceholderPage } from "../../pages/PlaceholderPage";
+import { ReportsPage } from "../../pages/ReportsPage";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicOnlyRoute } from "./PublicOnlyRoute";
@@ -95,7 +95,7 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <AppLayout>
-              <PlaceholderPage title="Relatórios" />
+              <ReportsPage />
             </AppLayout>
           </ProtectedRoute>
         }

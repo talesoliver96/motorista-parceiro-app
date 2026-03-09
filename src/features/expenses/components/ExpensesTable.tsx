@@ -1,4 +1,5 @@
 import {
+  Chip,
   IconButton,
   Paper,
   Stack,
@@ -15,15 +16,15 @@ import {
 } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
-import type { Expense } from "../../../types/database";
 import { formatCurrency, formatDate } from "../../earnings/earnings.utils";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { AppCard } from "../../../components/common/AppCard";
+import type { ExpenseListItem } from "../expenses.types";
 
 type Props = {
-  items: Expense[];
-  onEdit: (item: Expense) => void;
-  onDelete: (item: Expense) => void;
+  items: ExpenseListItem[];
+  onEdit: (item: ExpenseListItem) => void;
+  onDelete: (item: ExpenseListItem) => void;
 };
 
 export function ExpensesTable({ items, onEdit, onDelete }: Props) {
@@ -56,19 +57,23 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
                   {formatCurrency(item.amount)}
                 </Typography>
 
-                <Stack direction="row" spacing={0.5}>
-                  <IconButton size="small" onClick={() => onEdit(item)}>
-                    <EditRoundedIcon fontSize="small" />
-                  </IconButton>
+                {item.source === "manual" ? (
+                  <Stack direction="row" spacing={0.5}>
+                    <IconButton size="small" onClick={() => onEdit(item)}>
+                      <EditRoundedIcon fontSize="small" />
+                    </IconButton>
 
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => onDelete(item)}
-                  >
-                    <DeleteRoundedIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => onDelete(item)}
+                    >
+                      <DeleteRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                ) : (
+                  <Chip size="small" label="Automático" color="info" />
+                )}
               </Stack>
 
               <Typography variant="body2" color="text.secondary">
@@ -96,11 +101,12 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
 
   return (
     <TableContainer component={Paper}>
-      <Table size="small" sx={{ minWidth: 680 }}>
+      <Table size="small" sx={{ minWidth: 760 }}>
         <TableHead>
           <TableRow>
             <TableCell>Data</TableCell>
             <TableCell>Categoria</TableCell>
+            <TableCell>Origem</TableCell>
             <TableCell>Observações</TableCell>
             <TableCell align="right">Valor</TableCell>
             <TableCell align="right">Ações</TableCell>
@@ -113,10 +119,17 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
               <TableCell>{formatDate(item.date)}</TableCell>
               <TableCell>{item.category}</TableCell>
               <TableCell>
+                {item.source === "manual" ? (
+                  <Chip size="small" label="Manual" />
+                ) : (
+                  <Chip size="small" label="Automático" color="info" />
+                )}
+              </TableCell>
+              <TableCell>
                 <Typography
                   variant="body2"
                   noWrap
-                  sx={{ maxWidth: 220 }}
+                  sx={{ maxWidth: 260 }}
                   title={item.notes ?? ""}
                 >
                   {item.notes || "-"}
@@ -124,14 +137,20 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
               </TableCell>
               <TableCell align="right">{formatCurrency(item.amount)}</TableCell>
               <TableCell align="right">
-                <Stack direction="row" justifyContent="flex-end">
-                  <IconButton onClick={() => onEdit(item)}>
-                    <EditRoundedIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton color="error" onClick={() => onDelete(item)}>
-                    <DeleteRoundedIcon fontSize="small" />
-                  </IconButton>
-                </Stack>
+                {item.source === "manual" ? (
+                  <Stack direction="row" justifyContent="flex-end">
+                    <IconButton onClick={() => onEdit(item)}>
+                      <EditRoundedIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton color="error" onClick={() => onDelete(item)}>
+                      <DeleteRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    -
+                  </Typography>
+                )}
               </TableCell>
             </TableRow>
           ))}

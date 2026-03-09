@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Stack, Typography } from "@mui/material";
 import { PageContainer } from "../components/common/PageContainer";
 import { useAuth } from "../app/providers/AuthProvider";
-import type { Expense } from "../types/database";
+import type { Expense, Earning } from "../types/database";
 import { expensesService } from "../features/expenses/expenses.service";
+import { earningsService } from "../features/earnings/earnings.service";
 import { ExpensesToolbar } from "../features/expenses/components/ExpensesToolbar";
 import { ExpensesTable } from "../features/expenses/components/ExpensesTable";
 import { ExpensesFormDialog } from "../features/expenses/components/ExpensesFormDialog";
@@ -15,6 +16,8 @@ import {
 } from "../features/earnings/earnings.utils";
 import { AppCard } from "../components/common/AppCard";
 import { useSnackbar } from "notistack";
+import type { ExpenseListItem } from "../features/expenses/expenses.types";
+import { buildAutomaticFuelExpenses } from "../features/expenses/expenses.utils";
 
 export function ExpensesPage() {
   const { user } = useAuth();
@@ -24,7 +27,8 @@ export function ExpensesPage() {
   const [startDate, setStartDate] = useState(initialRange.startDate);
   const [endDate, setEndDate] = useState(initialRange.endDate);
 
-  const [items, setItems] = useState<Expense[]>([]);
+  const [manualItems, setManualItems] = useState<Expense[]>([]);
+  const [earnings, setEarnings] = useState<Earning[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -39,8 +43,14 @@ export function ExpensesPage() {
 
     try {
       setLoading(true);
-      const data = await expensesService.listByPeriod(user.id, startDate, endDate);
-      setItems(data);
+
+      const [expensesData, earningsData] = await Promise.all([
+        expensesService.listByPeriod(user.id, startDate, endDate),
+        earningsService.listByPeriod(user.id, startDate, endDate),
+      ]);
+
+      setManualItems(expensesData);
+      setEarnings(earningsData);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao carregar gastos", {
@@ -55,22 +65,53 @@ export function ExpensesPage() {
     loadData();
   }, [user, startDate, endDate]);
 
-  const totalExpenses = useMemo(
-    () => items.reduce((acc, item) => acc + Number(item.amount || 0), 0),
-    [items]
+  const automaticFuelItems = useMemo(
+    () => buildAutomaticFuelExpenses(earnings),
+    [earnings]
   );
+
+  const items = useMemo<ExpenseListItem[]>(() => {
+    const manual: ExpenseListItem[] = manualItems.map((item) => ({
+      ...item,
+      source: "manual",
+      isReadonly: false,
+    }));
+
+    return [...manual, ...automaticFuelItems].sort((a, b) => {
+      if (a.date === b.date) {
+        return b.created_at.localeCompare(a.created_at);
+      }
+
+      return b.date.localeCompare(a.date);
+    });
+  }, [manualItems, automaticFuelItems]);
+
+  const manualTotal = useMemo(
+    () => manualItems.reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [manualItems]
+  );
+
+  const automaticFuelTotal = useMemo(
+    () =>
+      automaticFuelItems.reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [automaticFuelItems]
+  );
+
+  const totalExpenses = manualTotal + automaticFuelTotal;
 
   const handleCreate = () => {
     setSelectedItem(null);
     setFormOpen(true);
   };
 
-  const handleEdit = (item: Expense) => {
+  const handleEdit = (item: ExpenseListItem) => {
+    if (item.source !== "manual") return;
     setSelectedItem(item);
     setFormOpen(true);
   };
 
-  const handleDeleteRequest = (item: Expense) => {
+  const handleDeleteRequest = (item: ExpenseListItem) => {
+    if (item.source !== "manual") return;
     setItemToDelete(item);
     setDeleteOpen(true);
   };
@@ -136,16 +177,32 @@ export function ExpensesPage() {
         <Stack spacing={0.5}>
           <Typography variant="h4">Gastos</Typography>
           <Typography color="text.secondary">
-            Cadastre seus custos para acompanhar o lucro real.
+            Cadastre seus custos manuais e acompanhe também o combustível calculado automaticamente.
           </Typography>
         </Stack>
 
-        <AppCard>
-          <Typography variant="body2" color="text.secondary">
-            Total de gastos do período
-          </Typography>
-          <Typography variant="h5">{formatCurrency(totalExpenses)}</Typography>
-        </AppCard>
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+          <AppCard sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Gastos manuais
+            </Typography>
+            <Typography variant="h5">{formatCurrency(manualTotal)}</Typography>
+          </AppCard>
+
+          <AppCard sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Combustível automático
+            </Typography>
+            <Typography variant="h5">{formatCurrency(automaticFuelTotal)}</Typography>
+          </AppCard>
+
+          <AppCard sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Total de gastos
+            </Typography>
+            <Typography variant="h5">{formatCurrency(totalExpenses)}</Typography>
+          </AppCard>
+        </Stack>
 
         <ExpensesToolbar
           startDate={startDate}
@@ -184,7 +241,7 @@ export function ExpensesPage() {
         open={deleteOpen}
         loading={saving}
         title="Excluir gasto"
-        description="Tem certeza que deseja excluir este gasto? Esta ação não pode ser desfeita."
+        description="Tem certeza que deseja excluir este gasto manual? Esta ação não pode ser desfeita."
         onClose={() => {
           if (saving) return;
           setDeleteOpen(false);

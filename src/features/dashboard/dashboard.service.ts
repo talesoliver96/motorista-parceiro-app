@@ -8,10 +8,12 @@ import {
   sumGross,
   sumKm,
 } from "./dashboard.utils";
+import { buildAutomaticFuelExpenses } from "../expenses/expenses.utils";
+import type { ExpenseListItem } from "../expenses/expenses.types";
 
 export type DashboardData = {
   earnings: Earning[];
-  expenses: Expense[];
+  expenses: ExpenseListItem[];
   gross: number;
   totalExpenses: number;
   net: number;
@@ -51,7 +53,18 @@ export const dashboardService = {
     if (expensesResult.error) throw expensesResult.error;
 
     const earnings = (earningsResult.data ?? []) as Earning[];
-    const expenses = (expensesResult.data ?? []) as Expense[];
+    const manualExpenses = (expensesResult.data ?? []) as Expense[];
+
+    const automaticFuelExpenses = buildAutomaticFuelExpenses(earnings);
+
+    const expenses: ExpenseListItem[] = [
+      ...manualExpenses.map((item) => ({
+        ...item,
+        source: "manual" as const,
+        isReadonly: false,
+      })),
+      ...automaticFuelExpenses,
+    ];
 
     const gross = sumGross(earnings);
     const totalExpenses = sumExpenses(expenses);

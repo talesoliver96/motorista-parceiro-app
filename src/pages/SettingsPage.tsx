@@ -17,11 +17,55 @@ import { authService } from "../features/auth/auth.service";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 
-const settingsSchema = z.object({
-  phone: z.string().min(8, "Digite um telefone válido"),
-  email: z.email("Digite um e-mail válido"),
-  password: z.string().optional(),
-});
+const settingsSchema = z
+  .object({
+    phone: z.string().min(8, "Digite um telefone válido"),
+    email: z.string().email("Digite um e-mail válido"),
+    currentPassword: z.string().optional(),
+    newPassword: z.string().optional(),
+    confirmNewPassword: z.string().optional(),
+  })
+  .superRefine((values, ctx) => {
+    const currentPassword = values.currentPassword?.trim() ?? "";
+    const newPassword = values.newPassword?.trim() ?? "";
+    const confirmNewPassword = values.confirmNewPassword?.trim() ?? "";
+
+    const wantsToChangePassword = newPassword.length > 0;
+
+    if (wantsToChangePassword) {
+      if (!currentPassword) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["currentPassword"],
+          message: "Digite sua senha atual",
+        });
+      }
+
+      if (newPassword.length < 6) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["newPassword"],
+          message: "A nova senha deve ter pelo menos 6 caracteres",
+        });
+      }
+
+      if (!confirmNewPassword) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["confirmNewPassword"],
+          message: "Confirme a nova senha",
+        });
+      }
+
+      if (newPassword !== confirmNewPassword) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["confirmNewPassword"],
+          message: "A confirmação da nova senha não confere",
+        });
+      }
+    }
+  });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
@@ -36,11 +80,13 @@ export function SettingsPage() {
     reset,
     formState: { errors },
   } = useForm<SettingsFormData>({
-    resolver: zodResolver(settingsSchema),
+    resolver: zodResolver(settingsSchema) as any,
     defaultValues: {
       phone: "",
       email: "",
-      password: "",
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
     },
   });
 
@@ -48,7 +94,9 @@ export function SettingsPage() {
     reset({
       phone: profile?.phone || "",
       email: user?.email || "",
-      password: "",
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
     });
   }, [profile, user, reset]);
 
@@ -64,8 +112,13 @@ export function SettingsPage() {
         await authService.updateEmail(values.email);
       }
 
-      if (values.password?.trim()) {
-        await authService.updatePassword(values.password);
+      if (values.newPassword?.trim()) {
+        await authService.verifyCurrentPassword(
+          user?.email || "",
+          values.currentPassword || ""
+        );
+
+        await authService.updatePassword(values.newPassword);
       }
 
       await refreshProfile();
@@ -77,7 +130,9 @@ export function SettingsPage() {
       reset({
         phone: values.phone,
         email: values.email,
-        password: "",
+        currentPassword: "",
+        newPassword: "",
+        confirmNewPassword: "",
       });
     } catch (error) {
       console.error(error);
@@ -148,12 +203,33 @@ export function SettingsPage() {
 
               <Grid size={{ xs: 12, md: 6 }}>
                 <TextField
+                  label="Senha atual"
+                  type="password"
+                  placeholder="Obrigatória para trocar a senha"
+                  {...register("currentPassword")}
+                  error={!!errors.currentPassword}
+                  helperText={errors.currentPassword?.message}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
                   label="Nova senha"
                   type="password"
                   placeholder="Digite apenas se quiser trocar"
-                  {...register("password")}
-                  error={!!errors.password}
-                  helperText={errors.password?.message}
+                  {...register("newPassword")}
+                  error={!!errors.newPassword}
+                  helperText={errors.newPassword?.message}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  label="Confirmar nova senha"
+                  type="password"
+                  {...register("confirmNewPassword")}
+                  error={!!errors.confirmNewPassword}
+                  helperText={errors.confirmNewPassword?.message}
                 />
               </Grid>
             </Grid>
