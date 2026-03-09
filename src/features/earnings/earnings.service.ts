@@ -1,6 +1,6 @@
 import { supabase } from "../../lib/supabase";
 import type { Earning } from "../../types/database";
-import type { EarningFormData } from "./earnings.schemas";
+import type { EarningFormValues } from "./earnings.schemas";
 
 function nullableNumber(value: unknown) {
   return typeof value === "number" && !Number.isNaN(value) ? value : null;
@@ -28,7 +28,7 @@ export const earningsService = {
     return (data ?? []) as Earning[];
   },
 
-  async create(userId: string, values: EarningFormData) {
+  async create(userId: string, values: EarningFormValues) {
     const payload = {
       user_id: userId,
       date: values.date,
@@ -48,7 +48,7 @@ export const earningsService = {
     if (error) throw error;
   },
 
-  async update(id: string, userId: string, values: EarningFormData) {
+  async update(id: string, userId: string, values: EarningFormValues) {
     const payload = {
       user_id: userId,
       date: values.date,

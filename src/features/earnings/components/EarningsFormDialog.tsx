@@ -59,7 +59,7 @@ export function EarningsFormDialog({
     watch,
     formState: { errors },
   } = useForm<EarningFormValues>({
-    resolver: zodResolver(earningSchema),
+    resolver: zodResolver(earningSchema) as any,
     defaultValues: {
       date: "",
       vehicle_type: "car",

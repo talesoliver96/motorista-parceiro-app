@@ -55,7 +55,7 @@ export function ExpensesFormDialog({
     reset,
     formState: { errors },
   } = useForm<ExpenseFormData>({
-    resolver: zodResolver(expenseSchema),
+    resolver: zodResolver(expenseSchema) as any,
     defaultValues: {
       date: "",
       category: "",
