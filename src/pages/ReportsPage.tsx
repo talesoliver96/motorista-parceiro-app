@@ -26,11 +26,20 @@ import {
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { DashboardFilters } from "../features/dashboard/components/DashboardFilters";
-import { formatCurrency, formatDate, getCurrentMonthRange } from "../features/earnings/earnings.utils";
-import { reportsService, type ReportsData } from "../features/reports/reports.service";
+import {
+  formatCurrency,
+  formatDate,
+  getCurrentMonthRange,
+} from "../features/earnings/earnings.utils";
+import {
+  reportsService,
+  type ReportsData,
+} from "../features/reports/reports.service";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useSnackbar } from "notistack";
 import { AppSkeleton } from "../components/common/AppSkeleton";
+import { PremiumLockedState } from "../components/common/PremiumLockedState";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 
 const emptyReportsData: ReportsData = {
   earnings: [],
@@ -49,11 +58,20 @@ const emptyReportsData: ReportsData = {
   topNetDays: [],
 };
 
-const pieColors = ["#1976d2", "#42a5f5", "#90caf9", "#1565c0", "#64b5f6", "#1e88e5"];
+const pieColors = [
+  "#1976d2",
+  "#42a5f5",
+  "#90caf9",
+  "#1565c0",
+  "#64b5f6",
+  "#1e88e5",
+];
 
 export function ReportsPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+
+  const isPremium = isPremiumProfile(profile);
 
   const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
@@ -63,7 +81,7 @@ export function ReportsPage() {
   const [data, setData] = useState<ReportsData>(emptyReportsData);
 
   const loadReports = async () => {
-    if (!user) return;
+    if (!user || !isPremium) return;
 
     try {
       setLoading(true);
@@ -87,7 +105,7 @@ export function ReportsPage() {
 
   useEffect(() => {
     loadReports();
-  }, [user, startDate, endDate]);
+  }, [user, startDate, endDate, isPremium]);
 
   return (
     <PageContainer>
@@ -95,203 +113,230 @@ export function ReportsPage() {
         <Stack spacing={0.5}>
           <Typography variant="h4">Relatórios</Typography>
           <Typography color="text.secondary">
-            Analise ganhos, gastos manuais, combustível automático e desempenho líquido do período.
+            Analise ganhos, gastos, combustível automático e desempenho líquido do período.
           </Typography>
         </Stack>
 
-        <DashboardFilters
-          startDate={startDate}
-          endDate={endDate}
-          onChangeStartDate={setStartDate}
-          onChangeEndDate={setEndDate}
-        />
-
-        {loading ? (
-          <AppSkeleton />
+        {!isPremium ? (
+          <PremiumLockedState
+            title="Relatórios avançados são premium"
+            description="Libere gráficos, melhores dias líquidos, custo automático de combustível e visão avançada do seu desempenho."
+          />
         ) : (
           <>
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Ganho bruto
-                  </Typography>
-                  <Typography variant="h5">{formatCurrency(data.gross)}</Typography>
-                </AppCard>
-              </Grid>
+            <DashboardFilters
+              startDate={startDate}
+              endDate={endDate}
+              onChangeStartDate={setStartDate}
+              onChangeEndDate={setEndDate}
+            />
 
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Gastos manuais
-                  </Typography>
-                  <Typography variant="h5">
-                    {formatCurrency(data.manualExpensesTotal)}
-                  </Typography>
-                </AppCard>
-              </Grid>
+            {loading ? (
+              <AppSkeleton />
+            ) : (
+              <>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        Ganho bruto
+                      </Typography>
+                      <Typography variant="h5">
+                        {formatCurrency(data.gross)}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Combustível automático
-                  </Typography>
-                  <Typography variant="h5">
-                    {formatCurrency(data.automaticFuelTotal)}
-                  </Typography>
-                </AppCard>
-              </Grid>
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        Gastos manuais
+                      </Typography>
+                      <Typography variant="h5">
+                        {formatCurrency(data.manualExpensesTotal)}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Total de gastos
-                  </Typography>
-                  <Typography variant="h5">
-                    {formatCurrency(data.totalExpenses)}
-                  </Typography>
-                </AppCard>
-              </Grid>
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        Combustível automático
+                      </Typography>
+                      <Typography variant="h5">
+                        {formatCurrency(data.automaticFuelTotal)}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Lucro líquido
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    color={data.net >= 0 ? "success.main" : "error.main"}
-                  >
-                    {formatCurrency(data.net)}
-                  </Typography>
-                </AppCard>
-              </Grid>
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        Total de gastos
+                      </Typography>
+                      <Typography variant="h5">
+                        {formatCurrency(data.totalExpenses)}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
 
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    KM total
-                  </Typography>
-                  <Typography variant="h5">
-                    {data.totalKm > 0 ? data.totalKm.toFixed(2) : "-"}
-                  </Typography>
-                </AppCard>
-              </Grid>
-
-              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Ganho por KM
-                  </Typography>
-                  <Typography variant="h5">
-                    {data.earningPerKm ? formatCurrency(data.earningPerKm) : "-"}
-                  </Typography>
-                </AppCard>
-              </Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid size={{ xs: 12, lg: 7 }}>
-                <AppCard sx={{ height: 380 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Ganhos por dia da semana
-                  </Typography>
-
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={data.earningsByWeekday}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Bar dataKey="gross" fill="#1976d2" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </AppCard>
-              </Grid>
-
-              <Grid size={{ xs: 12, lg: 5 }}>
-                <AppCard sx={{ height: 380 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Gastos por categoria
-                  </Typography>
-
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={data.expensesByCategory}
-                        dataKey="amount"
-                        nameKey="category"
-                        outerRadius={95}
-                        label
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        Lucro líquido
+                      </Typography>
+                      <Typography
+                        variant="h5"
+                        color={data.net >= 0 ? "success.main" : "error.main"}
                       >
-                        {data.expensesByCategory.map((_, index) => (
-                          <Cell
-                            key={index}
-                            fill={pieColors[index % pieColors.length]}
+                        {formatCurrency(data.net)}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        KM total
+                      </Typography>
+                      <Typography variant="h5">
+                        {data.totalKm > 0 ? data.totalKm.toFixed(2) : "-"}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
+
+                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                    <AppCard>
+                      <Typography variant="body2" color="text.secondary">
+                        Ganho por KM
+                      </Typography>
+                      <Typography variant="h5">
+                        {data.earningPerKm
+                          ? formatCurrency(data.earningPerKm)
+                          : "-"}
+                      </Typography>
+                    </AppCard>
+                  </Grid>
+                </Grid>
+
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12, lg: 7 }}>
+                    <AppCard sx={{ height: 380 }}>
+                      <Typography variant="h6" gutterBottom>
+                        Ganhos por dia da semana
+                      </Typography>
+
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={data.earningsByWeekday}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="day" />
+                          <YAxis />
+                          <Tooltip
+                            formatter={(value) =>
+                              formatCurrency(Number(value))
+                            }
                           />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </AppCard>
-              </Grid>
+                          <Bar
+                            dataKey="gross"
+                            fill="#1976d2"
+                            radius={[8, 8, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </AppCard>
+                  </Grid>
 
-              <Grid size={{ xs: 12 }}>
-                <AppCard>
-                  <Typography variant="h6" gutterBottom>
-                    Melhores dias líquidos do período
-                  </Typography>
+                  <Grid size={{ xs: 12, lg: 5 }}>
+                    <AppCard sx={{ height: 380 }}>
+                      <Typography variant="h6" gutterBottom>
+                        Gastos por categoria
+                      </Typography>
 
-                  <TableContainer component={Paper} variant="outlined">
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Data</TableCell>
-                          <TableCell align="right">Bruto</TableCell>
-                          <TableCell align="right">Gastos</TableCell>
-                          <TableCell align="right">Líquido</TableCell>
-                        </TableRow>
-                      </TableHead>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={data.expensesByCategory}
+                            dataKey="amount"
+                            nameKey="category"
+                            outerRadius={95}
+                            label
+                          >
+                            {data.expensesByCategory.map((_, index) => (
+                              <Cell
+                                key={index}
+                                fill={pieColors[index % pieColors.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value) =>
+                              formatCurrency(Number(value))
+                            }
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </AppCard>
+                  </Grid>
 
-                      <TableBody>
-                        {data.topNetDays.length ? (
-                          data.topNetDays.map((item) => (
-                            <TableRow key={item.date}>
-                              <TableCell>{formatDate(item.date)}</TableCell>
-                              <TableCell align="right">
-                                {formatCurrency(item.gross)}
-                              </TableCell>
-                              <TableCell align="right">
-                                {formatCurrency(item.expenses)}
-                              </TableCell>
-                              <TableCell
-                                align="right"
-                                sx={{
-                                  color:
-                                    item.net >= 0 ? "success.main" : "error.main",
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {formatCurrency(item.net)}
-                              </TableCell>
+                  <Grid size={{ xs: 12 }}>
+                    <AppCard>
+                      <Typography variant="h6" gutterBottom>
+                        Melhores dias líquidos do período
+                      </Typography>
+
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Data</TableCell>
+                              <TableCell align="right">Bruto</TableCell>
+                              <TableCell align="right">Gastos</TableCell>
+                              <TableCell align="right">Líquido</TableCell>
                             </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={4}>
-                              <Typography color="text.secondary">
-                                Nenhum dado suficiente no período.
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </AppCard>
-              </Grid>
-            </Grid>
+                          </TableHead>
+
+                          <TableBody>
+                            {data.topNetDays.length ? (
+                              data.topNetDays.map((item) => (
+                                <TableRow key={item.date}>
+                                  <TableCell>{formatDate(item.date)}</TableCell>
+                                  <TableCell align="right">
+                                    {formatCurrency(item.gross)}
+                                  </TableCell>
+                                  <TableCell align="right">
+                                    {formatCurrency(item.expenses)}
+                                  </TableCell>
+                                  <TableCell
+                                    align="right"
+                                    sx={{
+                                      color:
+                                        item.net >= 0
+                                          ? "success.main"
+                                          : "error.main",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {formatCurrency(item.net)}
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <TableRow>
+                                <TableCell colSpan={4}>
+                                  <Typography color="text.secondary">
+                                    Nenhum dado suficiente no período.
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </AppCard>
+                  </Grid>
+                </Grid>
+              </>
+            )}
           </>
         )}
       </Stack>

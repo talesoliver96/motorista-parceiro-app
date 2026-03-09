@@ -15,10 +15,13 @@ import {
 } from "../features/earnings/earnings.utils";
 import { AppCard } from "../components/common/AppCard";
 import { useSnackbar } from "notistack";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 
 export function EarningsPage() {
   const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+
+  const isPremium = isPremiumProfile(profile);
 
   const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
@@ -149,13 +152,13 @@ export function EarningsPage() {
           </Typography>
         </Stack>
 
-        {profile?.premium ? (
+        {isPremium ? (
           <Alert severity="success">
-            Sua conta está com recursos premium liberados.
+            Sua conta premium libera cálculo por KM e combustível automático.
           </Alert>
         ) : (
           <Alert severity="info">
-            Alguns cálculos avançados serão liberados apenas no plano premium.
+            Cálculos por KM e combustível automático estão disponíveis no plano premium.
           </Alert>
         )}
 
@@ -194,6 +197,7 @@ export function EarningsPage() {
             items={items}
             onEdit={handleEdit}
             onDelete={handleDeleteRequest}
+            isPremium={isPremium}
           />
         )}
       </Stack>

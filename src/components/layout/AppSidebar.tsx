@@ -1,5 +1,6 @@
 import {
   Box,
+  Chip,
   Divider,
   Drawer,
   IconButton,
@@ -30,7 +31,12 @@ const navItems = [
   { label: "Gastos", path: "/expenses", icon: <ReceiptLongRoundedIcon /> },
   { label: "Contato", path: "/contact", icon: <MailOutlineRoundedIcon /> },
   { label: "Configurações", path: "/settings", icon: <SettingsRoundedIcon /> },
-  { label: "Relatórios", path: "/reports", icon: <InsightsRoundedIcon /> },
+  {
+    label: "Relatórios",
+    path: "/reports",
+    icon: <InsightsRoundedIcon />,
+    premium: true,
+  },
 ];
 
 type Props = {
@@ -93,12 +99,36 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
                 {item.icon}
               </ListItemIcon>
 
-              {!collapsed && <ListItemText primary={item.label} />}
+              {!collapsed && (
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: 1,
+                  }}
+                >
+                  <ListItemText primary={item.label} />
+                  {item.premium ? (
+                    <Chip
+                      size="small"
+                      label="Premium"
+                      color="success"
+                      variant="outlined"
+                    />
+                  ) : null}
+                </Box>
+              )}
             </ListItemButton>
           );
 
           return collapsed ? (
-            <Tooltip key={item.path} title={item.label} placement="right">
+            <Tooltip
+              key={item.path}
+              title={item.premium ? `${item.label} • Premium` : item.label}
+              placement="right"
+            >
               <Box>{button}</Box>
             </Tooltip>
           ) : (

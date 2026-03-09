@@ -1,4 +1,6 @@
 import {
+  Box,
+  Chip,
   IconButton,
   Paper,
   Stack,
@@ -11,10 +13,10 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
-  Box,
 } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import type { Earning } from "../../../types/database";
 import {
   formatCurrency,
@@ -28,6 +30,7 @@ type Props = {
   items: Earning[];
   onEdit: (item: Earning) => void;
   onDelete: (item: Earning) => void;
+  isPremium: boolean;
 };
 
 const vehicleTypeLabel: Record<string, string> = {
@@ -36,7 +39,12 @@ const vehicleTypeLabel: Record<string, string> = {
   bicycle: "Bicicleta",
 };
 
-export function EarningsTable({ items, onEdit, onDelete }: Props) {
+export function EarningsTable({
+  items,
+  onEdit,
+  onDelete,
+  isPremium,
+}: Props) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -98,7 +106,18 @@ export function EarningsTable({ items, onEdit, onDelete }: Props) {
                 </Typography>
 
                 <Typography variant="body2">
-                  R$/KM: {earningPerKm ? formatCurrency(earningPerKm) : "-"}
+                  R$/KM:{" "}
+                  {isPremium ? (
+                    earningPerKm ? formatCurrency(earningPerKm) : "-"
+                  ) : (
+                    <Chip
+                      size="small"
+                      icon={<LockRoundedIcon />}
+                      label="Premium"
+                      color="success"
+                      variant="outlined"
+                    />
+                  )}
                 </Typography>
 
                 <Typography variant="body2">
@@ -159,7 +178,17 @@ export function EarningsTable({ items, onEdit, onDelete }: Props) {
                 </TableCell>
                 <TableCell align="right">{item.km_traveled ?? "-"}</TableCell>
                 <TableCell align="right">
-                  {earningPerKm ? formatCurrency(earningPerKm) : "-"}
+                  {isPremium ? (
+                    earningPerKm ? formatCurrency(earningPerKm) : "-"
+                  ) : (
+                    <Chip
+                      size="small"
+                      icon={<LockRoundedIcon />}
+                      label="Premium"
+                      color="success"
+                      variant="outlined"
+                    />
+                  )}
                 </TableCell>
                 <TableCell align="right">{item.work_hours ?? "-"}</TableCell>
                 <TableCell align="right">{item.trips_count ?? "-"}</TableCell>

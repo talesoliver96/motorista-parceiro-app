@@ -16,6 +16,7 @@ import { profileService } from "../features/auth/profile.service";
 import { authService } from "../features/auth/auth.service";
 import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
+import { getPremiumDescription, isPremiumProfile } from "../features/premium/premium.utils";
 
 const settingsSchema = z
   .object({
@@ -74,6 +75,8 @@ export function SettingsPage() {
   const { enqueueSnackbar } = useSnackbar();
   const [saving, setSaving] = useState(false);
 
+  const isPremium = isPremiumProfile(profile);
+
   const {
     register,
     handleSubmit,
@@ -104,21 +107,26 @@ export function SettingsPage() {
     try {
       setSaving(true);
 
+      const currentPassword = values.currentPassword?.trim() ?? "";
+      const newPassword = values.newPassword?.trim() ?? "";
+      const nextEmail = values.email.trim();
+      const nextPhone = values.phone.trim();
+
       await profileService.updateMyProfile({
-        phone: values.phone,
+        phone: nextPhone,
       });
 
-      if (values.email && values.email !== user?.email) {
-        await authService.updateEmail(values.email);
+      if (nextEmail && nextEmail !== user?.email) {
+        await authService.updateEmail(nextEmail);
       }
 
-      if (values.newPassword?.trim()) {
+      if (newPassword) {
         await authService.verifyCurrentPassword(
           user?.email || "",
-          values.currentPassword || ""
+          currentPassword
         );
 
-        await authService.updatePassword(values.newPassword);
+        await authService.updatePassword(newPassword);
       }
 
       await refreshProfile();
@@ -128,8 +136,8 @@ export function SettingsPage() {
       });
 
       reset({
-        phone: values.phone,
-        email: values.email,
+        phone: nextPhone,
+        email: nextEmail,
         currentPassword: "",
         newPassword: "",
         confirmNewPassword: "",
@@ -154,9 +162,8 @@ export function SettingsPage() {
           </Typography>
         </Stack>
 
-        <Alert severity="info">
-          Alterações de e-mail podem exigir confirmação, conforme a configuração
-          do seu projeto no Supabase.
+        <Alert severity={isPremium ? "success" : "info"}>
+          {getPremiumDescription(profile)}
         </Alert>
 
         <AppCard>

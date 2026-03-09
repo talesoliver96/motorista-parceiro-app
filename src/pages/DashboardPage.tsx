@@ -16,6 +16,7 @@ import { AppCard } from "../components/common/AppCard";
 import { formatCurrency } from "../features/earnings/earnings.utils";
 import { useSnackbar } from "notistack";
 import { AppSkeleton } from "../components/common/AppSkeleton";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 
 const emptyDashboardData: DashboardData = {
   earnings: [],
@@ -34,6 +35,8 @@ export function DashboardPage() {
   const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const navigate = useNavigate();
+
+  const isPremium = isPremiumProfile(profile);
 
   const now = useMemo(() => dayjs(), []);
   const [startDate, setStartDate] = useState(
@@ -55,7 +58,8 @@ export function DashboardPage() {
       const result = await dashboardService.getDashboardData(
         user.id,
         startDate,
-        endDate
+        endDate,
+        isPremium
       );
 
       setData(result);
@@ -71,7 +75,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     loadDashboard();
-  }, [user, startDate, endDate]);
+  }, [user, startDate, endDate, isPremium]);
 
   const firstName =
     profile?.name?.split(" ")[0] || user?.email?.split("@")[0] || "parceiro";
@@ -103,13 +107,13 @@ export function DashboardPage() {
           </Stack>
         </Stack>
 
-        {profile?.premium ? (
+        {isPremium ? (
           <Alert severity="success">
-            Sua conta está com recursos premium liberados.
+            Sua conta premium libera projeção, ganho por KM e combustível automático.
           </Alert>
         ) : (
           <Alert severity="info">
-            Alguns cálculos avançados serão liberados no plano premium.
+            Projeção, ganho por KM, combustível automático e relatórios são recursos premium.
           </Alert>
         )}
 
@@ -130,6 +134,7 @@ export function DashboardPage() {
               net={data.net}
               km={data.km}
               earningPerKm={data.earningPerKm}
+              isPremium={isPremium}
             />
 
             <Grid container spacing={2}>
@@ -148,7 +153,9 @@ export function DashboardPage() {
                   </Typography>
 
                   <Typography variant="h5" sx={{ mt: 1 }}>
-                    {data.projection ? formatCurrency(data.projection) : "-"}
+                    {isPremium && data.projection
+                      ? formatCurrency(data.projection)
+                      : "Premium"}
                   </Typography>
 
                   <Typography
@@ -156,7 +163,7 @@ export function DashboardPage() {
                     color="text.secondary"
                     sx={{ mt: 1 }}
                   >
-                    Disponível quando o filtro estiver no mês atual completo.
+                    Disponível para usuários premium no mês atual completo.
                   </Typography>
                 </AppCard>
               </Grid>

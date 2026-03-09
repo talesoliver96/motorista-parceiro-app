@@ -5,6 +5,8 @@ export type Profile = {
   name: string;
   phone: string | null;
   premium: boolean;
+  premium_forever: boolean;
+  premium_until: string | null;
   created_at: string;
   updated_at: string;
 };

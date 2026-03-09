@@ -31,7 +31,12 @@ export type DashboardData = {
 };
 
 export const dashboardService = {
-  async getDashboardData(userId: string, startDate: string, endDate: string) {
+  async getDashboardData(
+    userId: string,
+    startDate: string,
+    endDate: string,
+    isPremium: boolean
+  ) {
     const [earningsResult, expensesResult] = await Promise.all([
       supabase
         .from("earnings")
@@ -55,7 +60,9 @@ export const dashboardService = {
     const earnings = (earningsResult.data ?? []) as Earning[];
     const manualExpenses = (expensesResult.data ?? []) as Expense[];
 
-    const automaticFuelExpenses = buildAutomaticFuelExpenses(earnings);
+    const automaticFuelExpenses = isPremium
+      ? buildAutomaticFuelExpenses(earnings)
+      : [];
 
     const expenses: ExpenseListItem[] = [
       ...manualExpenses.map((item) => ({
@@ -70,7 +77,7 @@ export const dashboardService = {
     const totalExpenses = sumExpenses(expenses);
     const net = gross - totalExpenses;
     const km = sumKm(earnings);
-    const earningPerKm = km > 0 ? gross / km : null;
+    const earningPerKm = isPremium && km > 0 ? gross / km : null;
 
     return {
       earnings,
@@ -81,7 +88,9 @@ export const dashboardService = {
       km,
       earningPerKm,
       chartData: groupEarningsByDay(earnings),
-      projection: calculateProjection(gross, startDate, endDate),
+      projection: isPremium
+        ? calculateProjection(gross, startDate, endDate)
+        : null,
       recentActivity: getRecentActivity(earnings, expenses),
     } satisfies DashboardData;
   },

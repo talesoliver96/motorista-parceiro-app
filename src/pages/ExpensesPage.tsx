@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import { PageContainer } from "../components/common/PageContainer";
 import { useAuth } from "../app/providers/AuthProvider";
 import type { Expense, Earning } from "../types/database";
@@ -18,10 +18,13 @@ import { AppCard } from "../components/common/AppCard";
 import { useSnackbar } from "notistack";
 import type { ExpenseListItem } from "../features/expenses/expenses.types";
 import { buildAutomaticFuelExpenses } from "../features/expenses/expenses.utils";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 
 export function ExpensesPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+
+  const isPremium = isPremiumProfile(profile);
 
   const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
@@ -66,8 +69,8 @@ export function ExpensesPage() {
   }, [user, startDate, endDate]);
 
   const automaticFuelItems = useMemo(
-    () => buildAutomaticFuelExpenses(earnings),
-    [earnings]
+    () => (isPremium ? buildAutomaticFuelExpenses(earnings) : []),
+    [earnings, isPremium]
   );
 
   const items = useMemo<ExpenseListItem[]>(() => {
@@ -177,9 +180,19 @@ export function ExpensesPage() {
         <Stack spacing={0.5}>
           <Typography variant="h4">Gastos</Typography>
           <Typography color="text.secondary">
-            Cadastre seus custos manuais e acompanhe também o combustível calculado automaticamente.
+            Cadastre seus custos e acompanhe seu resultado real.
           </Typography>
         </Stack>
+
+        {isPremium ? (
+          <Alert severity="success">
+            Sua conta premium soma automaticamente o gasto de combustível quando houver KM, consumo e preço preenchidos.
+          </Alert>
+        ) : (
+          <Alert severity="info">
+            O cálculo automático de combustível é um recurso premium.
+          </Alert>
+        )}
 
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <AppCard sx={{ flex: 1 }}>
@@ -193,7 +206,9 @@ export function ExpensesPage() {
             <Typography variant="body2" color="text.secondary">
               Combustível automático
             </Typography>
-            <Typography variant="h5">{formatCurrency(automaticFuelTotal)}</Typography>
+            <Typography variant="h5">
+              {isPremium ? formatCurrency(automaticFuelTotal) : "Premium"}
+            </Typography>
           </AppCard>
 
           <AppCard sx={{ flex: 1 }}>

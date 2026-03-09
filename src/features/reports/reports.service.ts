@@ -62,7 +62,6 @@ export const reportsService = {
     }));
 
     const automaticFuelExpenses = buildAutomaticFuelExpenses(earnings);
-
     const allExpenses = [...manualExpenses, ...automaticFuelExpenses];
 
     const gross = earnings.reduce(

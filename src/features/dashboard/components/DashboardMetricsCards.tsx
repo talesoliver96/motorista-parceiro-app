@@ -8,6 +8,7 @@ type Props = {
   net: number;
   km: number;
   earningPerKm: number | null;
+  isPremium: boolean;
 };
 
 export function DashboardMetricsCards({
@@ -16,6 +17,7 @@ export function DashboardMetricsCards({
   net,
   km,
   earningPerKm,
+  isPremium,
 }: Props) {
   const items = [
     {
@@ -36,7 +38,7 @@ export function DashboardMetricsCards({
     },
     {
       label: "Ganho por KM",
-      value: earningPerKm ? formatCurrency(earningPerKm) : "-",
+      value: isPremium && earningPerKm ? formatCurrency(earningPerKm) : "Premium",
     },
   ];
 
