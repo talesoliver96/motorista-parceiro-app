@@ -39,6 +39,58 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+async function getAuthenticatedUser(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  authHeader: string | null;
+}) {
+  if (!params.authHeader) {
+    return null;
+  }
+
+  const token = params.authHeader.replace("Bearer ", "").trim();
+
+  if (!token) {
+    return null;
+  }
+
+  const response = await fetch(`${params.supabaseUrl}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: params.serviceRoleKey,
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return await response.json();
+}
+
+async function checkIfUserIsAdmin(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  userId: string;
+}) {
+  const response = await fetch(
+    `${params.supabaseUrl}/rest/v1/profiles?id=eq.${params.userId}&select=is_admin`,
+    {
+      headers: {
+        apikey: params.serviceRoleKey,
+        Authorization: `Bearer ${params.serviceRoleKey}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const data = await response.json();
+  return Boolean(data?.[0]?.is_admin);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -52,46 +104,21 @@ serve(async (req) => {
       return jsonResponse({ error: "Configuração do Supabase ausente" }, 500);
     }
 
-    const authHeader = req.headers.get("Authorization");
+    const authUser = await getAuthenticatedUser({
+      supabaseUrl,
+      serviceRoleKey,
+      authHeader: req.headers.get("Authorization"),
+    });
 
-    if (!authHeader) {
+    if (!authUser?.id) {
       return jsonResponse({ error: "Não autenticado" }, 401);
     }
 
-    const token = authHeader.replace("Bearer ", "");
-
-    // Descobre usuário autenticado
-    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: serviceRoleKey,
-      },
+    const isAdmin = await checkIfUserIsAdmin({
+      supabaseUrl,
+      serviceRoleKey,
+      userId: authUser.id,
     });
-
-    if (!userResponse.ok) {
-      return jsonResponse({ error: "Token inválido" }, 401);
-    }
-
-    const authUser = await userResponse.json();
-    const currentUserId = authUser?.id;
-
-    if (!currentUserId) {
-      return jsonResponse({ error: "Usuário inválido" }, 401);
-    }
-
-    // Verifica se é admin
-    const adminCheckResponse = await fetch(
-      `${supabaseUrl}/rest/v1/profiles?id=eq.${currentUserId}&select=is_admin`,
-      {
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      }
-    );
-
-    const adminCheck = await adminCheckResponse.json();
-    const isAdmin = Boolean(adminCheck?.[0]?.is_admin);
 
     if (!isAdmin) {
       return jsonResponse({ error: "Acesso negado" }, 403);
@@ -188,7 +215,6 @@ serve(async (req) => {
         isAdmin,
       } = body;
 
-      // Atualiza auth user
       const updateAuthPayload: Record<string, unknown> = {
         email,
       };
@@ -229,7 +255,9 @@ serve(async (req) => {
 
       if (premiumMode === "until_date") {
         premium = true;
-        premium_until = premiumUntil ? new Date(premiumUntil).toISOString() : null;
+        premium_until = premiumUntil
+          ? new Date(`${premiumUntil}T23:59:59`).toISOString()
+          : null;
       }
 
       const profileUpdateResponse = await fetch(
