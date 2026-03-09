@@ -105,6 +105,8 @@ export function SettingsPage() {
   }, [profile, user, reset]);
 
   const onSubmit = async (values: SettingsFormData) => {
+    if (!user) return;
+
     try {
       setSaving(true);
 
@@ -113,20 +115,16 @@ export function SettingsPage() {
       const nextEmail = values.email.trim();
       const nextPhone = values.phone.trim();
 
-      await profileService.updateMyProfile({
+      await profileService.updateProfileByUserId(user.id, {
         phone: nextPhone,
       });
 
-      if (nextEmail && nextEmail !== user?.email) {
+      if (nextEmail && nextEmail !== user.email) {
         await authService.updateEmail(nextEmail);
       }
 
       if (newPassword) {
-        await authService.verifyCurrentPassword(
-          user?.email || "",
-          currentPassword
-        );
-
+        await authService.verifyCurrentPassword(user.email || "", currentPassword);
         await authService.updatePassword(newPassword);
       }
 
@@ -168,7 +166,11 @@ export function SettingsPage() {
         </Alert>
 
         <AppCard>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
             <Typography variant="h6">Plano atual</Typography>
             <Chip
               label={isPremium ? "Premium" : "Free"}

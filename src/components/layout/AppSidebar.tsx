@@ -21,12 +21,21 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import MailOutlineRoundedIcon from "@mui/icons-material/MailOutlineRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useAuth } from "../../app/providers/AuthProvider";
 
 const drawerWidth = 240;
 const drawerCollapsed = 72;
 
-const navItems = [
+type NavItem = {
+  label: string;
+  path: string;
+  icon: React.ReactNode;
+  premium?: boolean;
+  adminOnly?: boolean;
+};
+
+const navItems: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <DashboardRoundedIcon /> },
   { label: "Ganhos", path: "/earnings", icon: <PaidRoundedIcon /> },
   { label: "Gastos", path: "/expenses", icon: <ReceiptLongRoundedIcon /> },
@@ -42,6 +51,7 @@ const navItems = [
     label: "Admin",
     path: "/admin/users",
     icon: <AdminPanelSettingsRoundedIcon />,
+    adminOnly: true,
   },
 ];
 
@@ -53,9 +63,20 @@ type Props = {
 export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  const width = collapsed ? drawerCollapsed : drawerWidth;
+  const width = collapsed ? 72 : drawerWidth;
+
+  const visibleItems = useMemo(() => {
+    return navItems.filter((item) => {
+      if (item.adminOnly) {
+        return Boolean(profile?.is_admin);
+      }
+
+      return true;
+    });
+  }, [profile]);
 
   const content = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -80,7 +101,7 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
       <Divider />
 
       <List sx={{ px: 1, py: 1 }}>
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const selected = location.pathname === item.path;
 
           const button = (

@@ -2,19 +2,7 @@ import { supabase } from "../../lib/supabase";
 import type { Profile } from "../../types/database";
 
 export const profileService = {
-  async getMyProfile(): Promise<Profile | null> {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError) {
-      throw authError;
-    }
-
-    const userId = authData.user?.id;
-
-    if (!userId) {
-      return null;
-    }
-
+  async getProfileByUserId(userId: string): Promise<Profile | null> {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -28,19 +16,7 @@ export const profileService = {
     return (data as Profile | null) ?? null;
   },
 
-  async updateMyProfile(values: { phone: string }) {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError) {
-      throw authError;
-    }
-
-    const userId = authData.user?.id;
-
-    if (!userId) {
-      throw new Error("Usuário não autenticado");
-    }
-
+  async updateProfileByUserId(userId: string, values: { phone: string }) {
     const { error } = await supabase
       .from("profiles")
       .update({

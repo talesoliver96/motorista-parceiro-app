@@ -32,96 +32,86 @@ export function AuthProvider({ children }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isMountedRef = useRef(true);
+  const mountedRef = useRef(true);
 
-  // Fila única de sincronização.
-  // Isso evita corrida entre bootstrap, visibilitychange e onAuthStateChange.
-  const authQueueRef = useRef<Promise<void>>(Promise.resolve());
-
-  const applyProfile = useCallback(async (nextUser: User | null) => {
+  const loadProfile = useCallback(async (nextUser: User | null) => {
     if (!nextUser) {
-      if (!isMountedRef.current) return;
+      if (!mountedRef.current) return;
       setProfile(null);
       return;
     }
 
     try {
-      const nextProfile = await profileService.getMyProfile();
+      const nextProfile = await profileService.getProfileByUserId(nextUser.id);
 
-      if (!isMountedRef.current) return;
+      if (!mountedRef.current) return;
       setProfile(nextProfile);
     } catch (error) {
       console.error("Erro ao carregar profile:", error);
 
-      if (!isMountedRef.current) return;
+      if (!mountedRef.current) return;
       setProfile(null);
     }
   }, []);
 
-  const syncAuthState = useCallback(
-    async (sessionFromEvent?: Session | null) => {
-      authQueueRef.current = authQueueRef.current.finally(async () => {
-        try {
-          const nextSession =
-            sessionFromEvent === undefined
-              ? await authService.getSession()
-              : sessionFromEvent;
-
-          if (!isMountedRef.current) return;
-
-          setSession(nextSession);
-          setUser(nextSession?.user ?? null);
-
-          await applyProfile(nextSession?.user ?? null);
-
-          if (!isMountedRef.current) return;
-          setLoading(false);
-        } catch (error) {
-          console.error("Erro ao sincronizar autenticação:", error);
-
-          if (!isMountedRef.current) return;
-
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-        }
-      });
-
-      return authQueueRef.current;
-    },
-    [applyProfile]
-  );
-
   const refreshProfile = useCallback(async () => {
-    await applyProfile(user);
-  }, [applyProfile, user]);
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+
+    await loadProfile(user);
+  }, [user, loadProfile]);
 
   useEffect(() => {
-    isMountedRef.current = true;
+    mountedRef.current = true;
 
-    void syncAuthState();
+    const bootstrap = async () => {
+      try {
+        const currentSession = await authService.getSession();
+
+        if (!mountedRef.current) return;
+
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+
+        await loadProfile(currentSession?.user ?? null);
+
+        if (!mountedRef.current) return;
+        setLoading(false);
+      } catch (error) {
+        console.error("Erro ao iniciar autenticação:", error);
+
+        if (!mountedRef.current) return;
+
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
+    };
+
+    void bootstrap();
 
     const { data } = authService.onAuthStateChange(
       async (_event, nextSession): Promise<void> => {
-        await syncAuthState(nextSession);
+        if (!mountedRef.current) return;
+
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
+
+        await loadProfile(nextSession?.user ?? null);
+
+        if (!mountedRef.current) return;
+        setLoading(false);
       }
     );
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void syncAuthState();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
     return () => {
-      isMountedRef.current = false;
+      mountedRef.current = false;
       data.subscription.unsubscribe();
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [syncAuthState]);
+  }, [loadProfile]);
 
   const value = useMemo(
     () => ({
