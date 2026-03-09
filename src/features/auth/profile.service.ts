@@ -3,21 +3,38 @@ import type { Profile } from "../../types/database";
 
 export const profileService = {
   async getMyProfile(): Promise<Profile | null> {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .single();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
 
-    if (error) {
-      console.error("Erro ao carregar profile:", error);
+    if (authError) {
+      throw authError;
+    }
+
+    const userId = authData.user?.id;
+
+    if (!userId) {
       return null;
     }
 
-    return data as Profile;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    return (data as Profile | null) ?? null;
   },
 
   async updateMyProfile(values: { phone: string }) {
-    const { data: authData } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      throw authError;
+    }
+
     const userId = authData.user?.id;
 
     if (!userId) {

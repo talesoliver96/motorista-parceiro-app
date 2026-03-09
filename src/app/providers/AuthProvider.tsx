@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -10,10 +11,6 @@ import type { Session, User } from "@supabase/supabase-js";
 import { authService } from "../../features/auth/auth.service";
 import { profileService } from "../../features/auth/profile.service";
 import type { Profile } from "../../types/database";
-import {
-  clearSupabaseBrowserStorage,
-  isSupabaseLockError,
-} from "../../features/auth/auth.utils";
 
 type AuthContextType = {
   user: User | null;
@@ -35,101 +32,96 @@ export function AuthProvider({ children }: Props) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Evita loop infinito de limpeza caso algo muito estranho aconteça.
-  const hasRecoveredLockRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  const refreshProfile = async () => {
+  // Fila única de sincronização.
+  // Isso evita corrida entre bootstrap, visibilitychange e onAuthStateChange.
+  const authQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const applyProfile = useCallback(async (nextUser: User | null) => {
+    if (!nextUser) {
+      if (!isMountedRef.current) return;
+      setProfile(null);
+      return;
+    }
+
     try {
       const nextProfile = await profileService.getMyProfile();
+
+      if (!isMountedRef.current) return;
       setProfile(nextProfile);
     } catch (error) {
-      console.error("Erro ao buscar profile:", error);
+      console.error("Erro ao carregar profile:", error);
+
+      if (!isMountedRef.current) return;
       setProfile(null);
     }
-  };
+  }, []);
+
+  const syncAuthState = useCallback(
+    async (sessionFromEvent?: Session | null) => {
+      authQueueRef.current = authQueueRef.current.finally(async () => {
+        try {
+          const nextSession =
+            sessionFromEvent === undefined
+              ? await authService.getSession()
+              : sessionFromEvent;
+
+          if (!isMountedRef.current) return;
+
+          setSession(nextSession);
+          setUser(nextSession?.user ?? null);
+
+          await applyProfile(nextSession?.user ?? null);
+
+          if (!isMountedRef.current) return;
+          setLoading(false);
+        } catch (error) {
+          console.error("Erro ao sincronizar autenticação:", error);
+
+          if (!isMountedRef.current) return;
+
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
+      });
+
+      return authQueueRef.current;
+    },
+    [applyProfile]
+  );
+
+  const refreshProfile = useCallback(async () => {
+    await applyProfile(user);
+  }, [applyProfile, user]);
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
 
-    async function bootstrap() {
-      try {
-        const currentSession = await authService.getSession();
-
-        if (!isMounted) return;
-
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-
-        if (currentSession?.user) {
-          await refreshProfile();
-        } else {
-          setProfile(null);
-        }
-
-        setLoading(false);
-      } catch (error) {
-        console.error("Erro ao iniciar autenticação:", error);
-
-        // Recuperação automática de lock/session quebrada do Supabase.
-        if (isSupabaseLockError(error) && !hasRecoveredLockRef.current) {
-          hasRecoveredLockRef.current = true;
-
-          clearSupabaseBrowserStorage();
-
-          try {
-            const retriedSession = await authService.getSession();
-
-            if (!isMounted) return;
-
-            setSession(retriedSession);
-            setUser(retriedSession?.user ?? null);
-
-            if (retriedSession?.user) {
-              await refreshProfile();
-            } else {
-              setProfile(null);
-            }
-
-            setLoading(false);
-            return;
-          } catch (retryError) {
-            console.error("Falha ao recuperar autenticação:", retryError);
-          }
-        }
-
-        if (!isMounted) return;
-
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-      }
-    }
-
-    bootstrap();
+    void syncAuthState();
 
     const { data } = authService.onAuthStateChange(
       async (_event, nextSession): Promise<void> => {
-        if (!isMounted) return;
-
-        setSession(nextSession);
-        setUser(nextSession?.user ?? null);
-
-        if (nextSession?.user) {
-          await refreshProfile();
-        } else {
-          setProfile(null);
-        }
-
-        setLoading(false);
+        await syncAuthState(nextSession);
       }
     );
 
-    return () => {
-      isMounted = false;
-      data.subscription.unsubscribe();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncAuthState();
+      }
     };
-  }, []);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMountedRef.current = false;
+      data.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [syncAuthState]);
 
   const value = useMemo(
     () => ({
@@ -139,7 +131,7 @@ export function AuthProvider({ children }: Props) {
       loading,
       refreshProfile,
     }),
-    [user, session, profile, loading]
+    [user, session, profile, loading, refreshProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

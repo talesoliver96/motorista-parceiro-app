@@ -68,7 +68,7 @@ const pieColors = [
 ];
 
 export function ReportsPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
   const isPremium = isPremiumProfile(profile);
@@ -80,32 +80,50 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportsData>(emptyReportsData);
 
-  const loadReports = async () => {
-    if (!user || !isPremium) return;
-
-    try {
-      setLoading(true);
-
-      const result = await reportsService.getReportsData(
-        user.id,
-        startDate,
-        endDate
-      );
-
-      setData(result);
-    } catch (error) {
-      console.error(error);
-      enqueueSnackbar("Erro ao carregar relatórios", {
-        variant: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadReports();
-  }, [user, startDate, endDate, isPremium]);
+    if (authLoading) return;
+
+    if (!user || !isPremium) {
+      setLoading(false);
+      setData(emptyReportsData);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadReports = async () => {
+      try {
+        setLoading(true);
+
+        const result = await reportsService.getReportsData(
+          user.id,
+          startDate,
+          endDate
+        );
+
+        if (cancelled) return;
+        setData(result);
+      } catch (error) {
+        console.error(error);
+
+        if (!cancelled) {
+          enqueueSnackbar("Erro ao carregar relatórios", {
+            variant: "error",
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadReports();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, isPremium, startDate, endDate, enqueueSnackbar]);
 
   return (
     <PageContainer>
@@ -117,7 +135,9 @@ export function ReportsPage() {
           </Typography>
         </Stack>
 
-        {!isPremium ? (
+        {authLoading ? (
+          <AppSkeleton />
+        ) : !isPremium ? (
           <PremiumLockedState
             title="Relatórios avançados são premium"
             description="Libere gráficos, melhores dias líquidos, custo automático de combustível e visão avançada do seu desempenho."
