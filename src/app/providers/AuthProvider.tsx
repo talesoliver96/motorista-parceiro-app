@@ -33,8 +33,9 @@ export function AuthProvider({ children }: Props) {
   const [loading, setLoading] = useState(true);
 
   const mountedRef = useRef(true);
+  const syncInFlightRef = useRef<Promise<void> | null>(null);
 
-  const loadProfile = useCallback(async (nextUser: User | null) => {
+  const loadProfileByUser = useCallback(async (nextUser: User | null) => {
     if (!nextUser) {
       if (!mountedRef.current) return;
       setProfile(null);
@@ -54,64 +55,81 @@ export function AuthProvider({ children }: Props) {
     }
   }, []);
 
+  const syncSession = useCallback(
+    async (nextSession?: Session | null) => {
+      // Evita sync concorrente.
+      if (syncInFlightRef.current) {
+        await syncInFlightRef.current;
+      }
+
+      const task = (async () => {
+        try {
+          const resolvedSession =
+            nextSession === undefined
+              ? await authService.getSession()
+              : nextSession;
+
+          if (!mountedRef.current) return;
+
+          setSession(resolvedSession);
+          setUser(resolvedSession?.user ?? null);
+
+          await loadProfileByUser(resolvedSession?.user ?? null);
+
+          if (!mountedRef.current) return;
+          setLoading(false);
+        } catch (error) {
+          console.error("Erro ao sincronizar autenticação:", error);
+
+          if (!mountedRef.current) return;
+
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        }
+      })();
+
+      syncInFlightRef.current = task;
+
+      try {
+        await task;
+      } finally {
+        if (syncInFlightRef.current === task) {
+          syncInFlightRef.current = null;
+        }
+      }
+    },
+    [loadProfileByUser]
+  );
+
   const refreshProfile = useCallback(async () => {
     if (!user) {
       setProfile(null);
       return;
     }
 
-    await loadProfile(user);
-  }, [user, loadProfile]);
+    await loadProfileByUser(user);
+  }, [user, loadProfileByUser]);
 
   useEffect(() => {
     mountedRef.current = true;
 
-    const bootstrap = async () => {
-      try {
-        const currentSession = await authService.getSession();
-
-        if (!mountedRef.current) return;
-
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-
-        await loadProfile(currentSession?.user ?? null);
-
-        if (!mountedRef.current) return;
-        setLoading(false);
-      } catch (error) {
-        console.error("Erro ao iniciar autenticação:", error);
-
-        if (!mountedRef.current) return;
-
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-        setLoading(false);
-      }
-    };
-
-    void bootstrap();
+    void syncSession();
 
     const { data } = authService.onAuthStateChange(
-      async (_event, nextSession): Promise<void> => {
-        if (!mountedRef.current) return;
-
-        setSession(nextSession);
-        setUser(nextSession?.user ?? null);
-
-        await loadProfile(nextSession?.user ?? null);
-
-        if (!mountedRef.current) return;
-        setLoading(false);
-      }
-    );
+  async (_event, nextSession): Promise<void> => {
+    queueMicrotask(() => {
+      void syncSession(nextSession);
+    });
+  }
+);
 
     return () => {
       mountedRef.current = false;
       data.subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, [syncSession]);
 
   const value = useMemo(
     () => ({

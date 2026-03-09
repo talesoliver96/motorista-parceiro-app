@@ -66,7 +66,7 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
   const { profile } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  const width = collapsed ? 72 : drawerWidth;
+ const width = collapsed ? drawerCollapsed : drawerWidth;
 
   const visibleItems = useMemo(() => {
     return navItems.filter((item) => {
