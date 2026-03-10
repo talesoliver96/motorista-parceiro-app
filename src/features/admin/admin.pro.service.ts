@@ -7,6 +7,7 @@ import type {
   NewUserPremiumPolicy,
   PaginatedResult,
   PremiumHistoryItem,
+  UserListFilter,
 } from "./admin.types";
 
 export const adminSettingsService = {
@@ -98,13 +99,27 @@ function buildPaginatedResult<T>(
 }
 
 export const adminProService = {
-  async listUsers(search = "") {
+  async listUsers(
+    search = "",
+    page = 1,
+    pageSize = 10,
+    filter: UserListFilter = "all"
+  ): Promise<PaginatedResult<AdminUserListItem>> {
     const data = await callFunction("admin-users-pro", {
       action: "list",
       search,
+      page,
+      pageSize,
+      filter,
     });
 
-    return (data?.users ?? []) as AdminUserListItem[];
+    return {
+      items: (data?.users ?? []) as AdminUserListItem[],
+      total: Number(data?.total ?? 0),
+      page: Number(data?.page ?? page),
+      pageSize: Number(data?.pageSize ?? pageSize),
+      totalPages: Number(data?.totalPages ?? 1),
+    };
   },
 
   async updateUser(payload: AdminUserUpdatePayload) {

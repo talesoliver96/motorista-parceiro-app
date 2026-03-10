@@ -22,10 +22,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useSnackbar } from "notistack";
+
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { AppDialog } from "../components/common/AppDialog";
@@ -36,6 +37,7 @@ import type {
   AdminMetrics,
   AdminUserListItem,
   AdminUserUpdatePayload,
+  UserListFilter,
 } from "../features/admin/admin.types";
 import {
   formatAdminDate,
@@ -52,7 +54,14 @@ const adminUserSchema = z
     email: z.string().email("Digite um e-mail válido"),
     password: z.string().optional(),
     premiumMode: z.enum(["free", "days", "until_date"]),
-    premiumDays: z.coerce.number().optional(),
+    premiumDays: z.preprocess((value) => {
+      if (value === "" || value === null || value === undefined) {
+        return undefined;
+      }
+
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    }, z.number().optional()),
     premiumUntil: z.string().optional(),
     isAdmin: z.boolean(),
     isBlocked: z.boolean(),
@@ -68,6 +77,7 @@ const adminUserSchema = z
 
     if (values.premiumMode === "days") {
       const days = Number(values.premiumDays ?? 0);
+
       if (!days || days <= 0) {
         ctx.addIssue({
           code: "custom",
@@ -86,8 +96,8 @@ const adminUserSchema = z
     }
   });
 
-type AdminUserFormValues = z.infer<typeof adminUserSchema>;
-type FilterType = "all" | "premium" | "free" | "admins" | "blocked";
+type AdminUserFormInput = z.input<typeof adminUserSchema>;
+type AdminUserFormValues = z.output<typeof adminUserSchema>;
 
 const emptyMetrics: AdminMetrics = {
   totalUsers: 0,
@@ -113,12 +123,16 @@ export function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
+
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [filter, setFilter] = useState<UserListFilter>("all");
   const [page, setPage] = useState(1);
 
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
   const [metrics, setMetrics] = useState<AdminMetrics>(emptyMetrics);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(null);
@@ -134,8 +148,8 @@ export function AdminUsersPage() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<AdminUserFormValues>({
-    resolver: zodResolver(adminUserSchema) as any,
+  } = useForm<AdminUserFormInput, unknown, AdminUserFormValues>({
+    resolver: zodResolver(adminUserSchema),
     defaultValues: {
       name: "",
       phone: "",
@@ -151,16 +165,23 @@ export function AdminUsersPage() {
 
   const premiumMode = watch("premiumMode");
 
-  const loadData = async (nextSearch = search) => {
+  const loadUsers = async (
+    nextPage = page,
+    nextSearch = appliedSearch,
+    nextFilter = filter
+  ) => {
     try {
       setLoading(true);
 
-      const [usersData, metricsData] = await Promise.all([
-        adminProService.listUsers(nextSearch),
+      const [usersResult, metricsData] = await Promise.all([
+        adminProService.listUsers(nextSearch, nextPage, PAGE_SIZE, nextFilter),
         adminProService.getMetrics(),
       ]);
 
-      setUsers(usersData);
+      setUsers(usersResult.items);
+      setTotalUsers(usersResult.total);
+      setTotalPages(usersResult.totalPages);
+      setPage(usersResult.page);
       setMetrics(metricsData ?? emptyMetrics);
     } catch (error) {
       console.error(error);
@@ -178,34 +199,24 @@ export function AdminUsersPage() {
       return;
     }
 
-    void loadData("");
+    void loadUsers(1, "", "all");
   }, [isAdmin]);
 
-  const filteredUsers = useMemo(() => {
-    switch (filter) {
-      case "premium":
-        return users.filter((item) => item.premium);
-      case "free":
-        return users.filter((item) => !item.premium);
-      case "admins":
-        return users.filter((item) => item.is_admin);
-      case "blocked":
-        return users.filter((item) => item.is_blocked);
-      default:
-        return users;
-    }
-  }, [users, filter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-
-  const paginatedUsers = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredUsers.slice(start, start + PAGE_SIZE);
-  }, [filteredUsers, page]);
-
-  useEffect(() => {
+  const handleSearch = async () => {
     setPage(1);
-  }, [search, filter]);
+    setAppliedSearch(searchInput);
+    await loadUsers(1, searchInput, filter);
+  };
+
+  const handleChangeFilter = async (value: UserListFilter) => {
+    setFilter(value);
+    setPage(1);
+    await loadUsers(1, appliedSearch, value);
+  };
+
+  const handleChangePage = async (nextPage: number) => {
+    await loadUsers(nextPage, appliedSearch, filter);
+  };
 
   const openEditDialog = (user: AdminUserListItem) => {
     setSelectedUser(user);
@@ -258,7 +269,8 @@ export function AdminUsersPage() {
 
       setDialogOpen(false);
       setSelectedUser(null);
-      await loadData();
+
+      await loadUsers(page, appliedSearch, filter);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao atualizar usuário", {
@@ -271,6 +283,7 @@ export function AdminUsersPage() {
 
   const handleConfirmDelete = async () => {
     if (!userToDelete) return;
+
     if (deleteConfirmText.trim() !== userToDelete.email.trim()) {
       enqueueSnackbar("Digite o e-mail exato do usuário para confirmar", {
         variant: "warning",
@@ -280,6 +293,7 @@ export function AdminUsersPage() {
 
     try {
       setDeleting(true);
+
       await adminProService.deleteUser(userToDelete.id);
 
       enqueueSnackbar("Usuário excluído com sucesso", {
@@ -289,7 +303,9 @@ export function AdminUsersPage() {
       setDeleteOpen(false);
       setUserToDelete(null);
       setDeleteConfirmText("");
-      await loadData();
+
+      const nextPage = users.length === 1 && page > 1 ? page - 1 : page;
+      await loadUsers(nextPage, appliedSearch, filter);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao excluir usuário", {
@@ -301,14 +317,7 @@ export function AdminUsersPage() {
   };
 
   if (!isAdmin) {
-    return (
-      <PageContainer>
-        <PremiumLockedState
-          title="Acesso restrito"
-          description="Essa área é exclusiva para administradores."
-        />
-      </PageContainer>
-    );
+    return <PremiumLockedState />;
   }
 
   return (
@@ -326,7 +335,7 @@ export function AdminUsersPage() {
         </Alert>
 
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
                 Total de usuários
@@ -335,7 +344,7 @@ export function AdminUsersPage() {
             </AppCard>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
                 Usuários premium
@@ -344,7 +353,7 @@ export function AdminUsersPage() {
             </AppCard>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
                 Administradores
@@ -353,7 +362,7 @@ export function AdminUsersPage() {
             </AppCard>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
                 Bloqueados
@@ -368,13 +377,13 @@ export function AdminUsersPage() {
             <Stack
               direction={{ xs: "column", md: "row" }}
               spacing={2}
-              justifyContent="space-between"
+              alignItems={{ xs: "stretch", md: "center" }}
             >
               <TextField
-                label="Buscar usuário"
-                placeholder="Digite nome ou e-mail"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                fullWidth
+                label="Buscar por nome, e-mail ou telefone"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 sx={{ maxWidth: 420, width: "100%" }}
                 InputProps={{
                   startAdornment: (
@@ -389,7 +398,9 @@ export function AdminUsersPage() {
                 select
                 label="Filtro"
                 value={filter}
-                onChange={(e) => setFilter(e.target.value as FilterType)}
+                onChange={(e) =>
+                  void handleChangeFilter(e.target.value as UserListFilter)
+                }
                 sx={{ minWidth: 180 }}
               >
                 <MenuItem value="all">Todos</MenuItem>
@@ -399,17 +410,36 @@ export function AdminUsersPage() {
                 <MenuItem value="blocked">Bloqueados</MenuItem>
               </TextField>
 
-              <Button variant="contained" onClick={() => loadData(search)}>
+              <Button
+                variant="contained"
+                onClick={() => void handleSearch()}
+                disabled={loading}
+              >
                 Buscar
               </Button>
             </Stack>
 
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              justifyContent="space-between"
+              spacing={1}
+            >
+              <Typography variant="body2" color="text.secondary">
+                {totalUsers} registro{totalUsers === 1 ? "" : "s"} encontrado
+                {totalUsers === 1 ? "" : "s"}.
+              </Typography>
+
+              <Typography variant="body2" color="text.secondary">
+                Página {page} de {totalPages}
+              </Typography>
+            </Stack>
+
             {loading ? (
-              <Typography>Carregando usuários...</Typography>
+              <Typography color="text.secondary">Carregando usuários...</Typography>
             ) : (
               <>
                 <TableContainer>
-                  <Table size="small">
+                  <Table>
                     <TableHead>
                       <TableRow>
                         <TableCell>Nome</TableCell>
@@ -425,55 +455,51 @@ export function AdminUsersPage() {
                     </TableHead>
 
                     <TableBody>
-                      {paginatedUsers.map((user) => (
+                      {users.map((user) => (
                         <TableRow key={user.id} hover>
                           <TableCell>{user.name || "-"}</TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>{user.phone || "-"}</TableCell>
                           <TableCell>
-                            <Chip
-                              size="small"
-                              label={getBlockedLabel(user.is_blocked)}
-                              color={user.is_blocked ? "error" : "success"}
-                              variant={user.is_blocked ? "filled" : "outlined"}
-                            />
+                            <Stack direction="row" spacing={1} flexWrap="wrap">
+                              <Chip
+                                size="small"
+                                label={getPremiumLabel(user)}
+                                color={user.premium ? "success" : "default"}
+                              />
+                              <Chip
+                                size="small"
+                                label={getBlockedLabel(user.is_blocked)}
+                                color={user.is_blocked ? "error" : "default"}
+                              />
+                            </Stack>
                           </TableCell>
                           <TableCell>
-                            <Chip
-                              size="small"
-                              label={getPremiumLabel(user)}
-                              color={user.premium ? "success" : "default"}
-                              variant={user.premium ? "filled" : "outlined"}
-                            />
+                            {user.is_admin ? (
+                              <Chip size="small" label="Administrador" color="primary" />
+                            ) : (
+                              <Chip size="small" label="Usuário" />
+                            )}
                           </TableCell>
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              label={user.is_admin ? "Sim" : "Não"}
-                              color={user.is_admin ? "warning" : "default"}
-                              variant={user.is_admin ? "filled" : "outlined"}
-                            />
-                          </TableCell>
+                          <TableCell>{user.is_admin ? "Sim" : "Não"}</TableCell>
                           <TableCell>{formatAdminDate(user.created_at)}</TableCell>
                           <TableCell>{formatAdminDate(user.last_sign_in_at)}</TableCell>
                           <TableCell align="right">
-                            <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                              <IconButton onClick={() => openEditDialog(user)}>
-                                <EditRoundedIcon />
-                              </IconButton>
+                            <IconButton onClick={() => openEditDialog(user)}>
+                              <EditRoundedIcon />
+                            </IconButton>
 
-                              <IconButton
-                                color="error"
-                                onClick={() => handleDeleteRequest(user)}
-                              >
-                                <DeleteRoundedIcon />
-                              </IconButton>
-                            </Stack>
+                            <IconButton
+                              color="error"
+                              onClick={() => handleDeleteRequest(user)}
+                            >
+                              <DeleteRoundedIcon />
+                            </IconButton>
                           </TableCell>
                         </TableRow>
                       ))}
 
-                      {!paginatedUsers.length ? (
+                      {!users.length ? (
                         <TableRow>
                           <TableCell colSpan={9}>
                             <Typography color="text.secondary">
@@ -486,14 +512,16 @@ export function AdminUsersPage() {
                   </Table>
                 </TableContainer>
 
-                <Stack direction="row" justifyContent="flex-end">
-                  <Pagination
-                    page={page}
-                    count={totalPages}
-                    onChange={(_, value) => setPage(value)}
-                    color="primary"
-                  />
-                </Stack>
+                {totalPages > 1 ? (
+                  <Stack alignItems="center" pt={1}>
+                    <Pagination
+                      page={page}
+                      count={totalPages}
+                      onChange={(_, value) => void handleChangePage(value)}
+                      color="primary"
+                    />
+                  </Stack>
+                ) : null}
               </>
             )}
           </Stack>
@@ -509,7 +537,7 @@ export function AdminUsersPage() {
         }}
         title="Editar usuário"
         actions={
-          <DialogActions sx={{ px: 0 }}>
+          <DialogActions>
             <Button
               onClick={() => {
                 if (saving) return;
@@ -522,7 +550,7 @@ export function AdminUsersPage() {
 
             <Button
               variant="contained"
-              onClick={handleSubmit(onSubmit)}
+              onClick={() => void handleSubmit(onSubmit)()}
               disabled={saving}
             >
               Salvar
@@ -530,127 +558,109 @@ export function AdminUsersPage() {
           </DialogActions>
         }
       >
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 6 }}>
+        <Stack spacing={2} mt={1}>
+          <TextField
+            label="Nome"
+            fullWidth
+            {...register("name")}
+            error={!!errors.name}
+            helperText={errors.name?.message}
+          />
+
+          <TextField
+            label="Telefone"
+            fullWidth
+            {...register("phone")}
+            error={!!errors.phone}
+            helperText={errors.phone?.message}
+          />
+
+          <TextField
+            label="E-mail"
+            fullWidth
+            {...register("email")}
+            error={!!errors.email}
+            helperText={errors.email?.message}
+          />
+
+          <TextField
+            label="Nova senha"
+            type="password"
+            fullWidth
+            {...register("password")}
+            error={!!errors.password}
+            helperText={errors.password?.message || "Preencha apenas se quiser alterar"}
+          />
+
+          <TextField
+            select
+            fullWidth
+            label="Premium"
+            {...register("premiumMode")}
+            error={!!errors.premiumMode}
+            helperText={errors.premiumMode?.message}
+          >
+            <MenuItem value="free">Free</MenuItem>
+            <MenuItem value="days">Premium por dias</MenuItem>
+            <MenuItem value="until_date">Premium até data</MenuItem>
+          </TextField>
+
+          {premiumMode === "days" ? (
+            <TextField
+              label="Quantidade de dias"
+              type="number"
+              fullWidth
+              {...register("premiumDays")}
+              error={!!errors.premiumDays}
+              helperText={errors.premiumDays?.message}
+            />
+          ) : null}
+
+          {premiumMode === "until_date" ? (
+            <TextField
+              label="Premium até"
+              type="date"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              {...register("premiumUntil")}
+              error={!!errors.premiumUntil}
+              helperText={errors.premiumUntil?.message}
+            />
+          ) : null}
+
+          <Controller
+            name="isAdmin"
+            control={control}
+            render={({ field }) => (
               <TextField
-                label="Nome"
-                {...register("name")}
-                error={!!errors.name}
-                helperText={errors.name?.message}
-              />
-            </Grid>
+                select
+                fullWidth
+                label="Permissão administrativa"
+                value={field.value ? "yes" : "no"}
+                onChange={(e) => field.onChange(e.target.value === "yes")}
+              >
+                <MenuItem value="no">Não</MenuItem>
+                <MenuItem value="yes">Sim</MenuItem>
+              </TextField>
+            )}
+          />
 
-            <Grid size={{ xs: 12, md: 6 }}>
+          <Controller
+            name="isBlocked"
+            control={control}
+            render={({ field }) => (
               <TextField
-                label="Telefone"
-                {...register("phone")}
-                error={!!errors.phone}
-                helperText={errors.phone?.message}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="E-mail"
-                type="email"
-                {...register("email")}
-                error={!!errors.email}
-                helperText={errors.email?.message}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                label="Nova senha"
-                type="password"
-                placeholder="Preencha só se quiser trocar"
-                {...register("password")}
-                error={!!errors.password}
-                helperText={errors.password?.message}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Controller
-                name="premiumMode"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    select
-                    label="Status premium"
-                    value={field.value}
-                    onChange={field.onChange}
-                  >
-                    <MenuItem value="free">Free</MenuItem>
-                    <MenuItem value="days">Premium por dias</MenuItem>
-                    <MenuItem value="until_date">Premium até data</MenuItem>
-                  </TextField>
-                )}
-              />
-            </Grid>
-
-            {premiumMode === "days" ? (
-              <Grid size={{ xs: 12, md: 6 }}>
-                <TextField
-                  label="Quantidade de dias"
-                  type="number"
-                  {...register("premiumDays")}
-                  error={!!errors.premiumDays}
-                  helperText={errors.premiumDays?.message}
-                />
-              </Grid>
-            ) : null}
-
-            {premiumMode === "until_date" ? (
-              <Grid size={{ xs: 12, md: 6 }}>
-                <TextField
-                  label="Premium até"
-                  type="date"
-                  InputLabelProps={{ shrink: true }}
-                  {...register("premiumUntil")}
-                  error={!!errors.premiumUntil}
-                  helperText={errors.premiumUntil?.message}
-                />
-              </Grid>
-            ) : null}
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Controller
-                name="isAdmin"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    select
-                    label="É administrador?"
-                    value={field.value ? "yes" : "no"}
-                    onChange={(e) => field.onChange(e.target.value === "yes")}
-                  >
-                    <MenuItem value="no">Não</MenuItem>
-                    <MenuItem value="yes">Sim</MenuItem>
-                  </TextField>
-                )}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Controller
-                name="isBlocked"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    select
-                    label="Status do usuário"
-                    value={field.value ? "blocked" : "active"}
-                    onChange={(e) => field.onChange(e.target.value === "blocked")}
-                  >
-                    <MenuItem value="active">Ativo</MenuItem>
-                    <MenuItem value="blocked">Bloqueado</MenuItem>
-                  </TextField>
-                )}
-              />
-            </Grid>
-          </Grid>
+                select
+                fullWidth
+                label="Status da conta"
+                value={field.value ? "blocked" : "active"}
+                onChange={(e) => field.onChange(e.target.value === "blocked")}
+              >
+                <MenuItem value="active">Ativo</MenuItem>
+                <MenuItem value="blocked">Bloqueado</MenuItem>
+              </TextField>
+            )}
+          />
         </Stack>
       </AppDialog>
 
@@ -658,18 +668,20 @@ export function AdminUsersPage() {
         open={deleteOpen}
         loading={deleting}
         title="Excluir usuário"
-        description={`Digite o e-mail do usuário para confirmar a exclusão definitiva: ${userToDelete?.email || ""}`}
+        description="Essa ação remove o usuário, perfil, ganhos, gastos e contatos. Digite o e-mail exato do usuário para confirmar."
         onClose={() => {
           if (deleting) return;
           setDeleteOpen(false);
           setUserToDelete(null);
           setDeleteConfirmText("");
         }}
-        onConfirm={handleConfirmDelete}
+        onConfirm={() => {
+          void handleConfirmDelete();
+        }}
       >
         <TextField
           fullWidth
-          label="Confirme digitando o e-mail"
+          label="Confirme com o e-mail do usuário"
           value={deleteConfirmText}
           onChange={(e) => setDeleteConfirmText(e.target.value)}
         />

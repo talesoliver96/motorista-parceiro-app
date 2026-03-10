@@ -119,6 +119,13 @@ export type UserSubscription = {
   updated_at: string;
 };
 
+export type UserListFilter =
+  | "all"
+  | "premium"
+  | "free"
+  | "admins"
+  | "blocked";
+
 export type PaginatedResult<T> = {
   items: T[];
   total: number;

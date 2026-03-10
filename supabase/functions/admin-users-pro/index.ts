@@ -14,9 +14,14 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+type UserListFilter = "all" | "premium" | "free" | "admins" | "blocked";
+
 type ListActionBody = {
   action: "list";
   search?: string;
+  page?: number;
+  pageSize?: number;
+  filter?: UserListFilter;
 };
 
 type UpdateActionBody = {
@@ -76,6 +81,93 @@ type RequestBody =
   | ResetSystemDataActionBody
   | ClearAllNonAdminUsersActionBody;
 
+type MergedUser = {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  premium: boolean;
+  premium_forever: boolean;
+  premium_until: string | null;
+  is_admin: boolean;
+  is_blocked: boolean;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+};
+
+async function fetchAllAuthUsers(
+  supabaseUrl: string,
+  serviceRoleKey: string
+): Promise<any[]> {
+  const perPage = 200;
+  let page = 1;
+  const allUsers: any[] = [];
+
+  while (true) {
+    const usersResponse = await fetch(
+      `${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=${perPage}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }
+    );
+
+    if (!usersResponse.ok) {
+      const errorText = await usersResponse.text();
+      throw new Error(errorText || "Erro ao buscar usuários auth");
+    }
+
+    const usersData = await usersResponse.json();
+    const users = Array.isArray(usersData?.users) ? usersData.users : [];
+
+    allUsers.push(...users);
+
+    if (users.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return allUsers;
+}
+
+async function fetchAllProfiles(
+  supabaseUrl: string,
+  serviceRoleKey: string
+): Promise<any[]> {
+  const response = await fetch(`${supabaseUrl}/rest/v1/profiles?select=*`, {
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || "Erro ao buscar perfis");
+  }
+
+  return await response.json();
+}
+
+function matchesFilter(user: MergedUser, filter: UserListFilter) {
+  switch (filter) {
+    case "premium":
+      return user.premium;
+    case "free":
+      return !user.premium;
+    case "admins":
+      return user.is_admin;
+    case "blocked":
+      return user.is_blocked;
+    default:
+      return true;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -107,47 +199,20 @@ serve(async (req) => {
 
     if (body.action === "list") {
       const search = body.search?.trim().toLowerCase() ?? "";
+      const filter = body.filter ?? "all";
+      const page = Math.max(1, Number(body.page ?? 1));
+      const pageSize = Math.max(1, Math.min(100, Number(body.pageSize ?? 10)));
 
-      const usersResponse = await fetch(
-        `${supabaseUrl}/auth/v1/admin/users?page=1&per_page=500`,
-        {
-          headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-        }
-      );
-
-      if (!usersResponse.ok) {
-        const errorText = await usersResponse.text();
-        return jsonResponse(corsHeaders, { error: errorText }, 500);
-      }
-
-      const usersData = await usersResponse.json();
-      const users = usersData?.users ?? [];
-
-      const profilesResponse = await fetch(
-        `${supabaseUrl}/rest/v1/profiles?select=*`,
-        {
-          headers: {
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-        }
-      );
-
-      if (!profilesResponse.ok) {
-        const errorText = await profilesResponse.text();
-        return jsonResponse(corsHeaders, { error: errorText }, 500);
-      }
-
-      const profiles = await profilesResponse.json();
+      const [users, profiles] = await Promise.all([
+        fetchAllAuthUsers(supabaseUrl, serviceRoleKey),
+        fetchAllProfiles(supabaseUrl, serviceRoleKey),
+      ]);
 
       const profilesMap = new Map(
         profiles.map((profile: any) => [profile.id, profile])
       );
 
-      const merged = users
+      const merged: MergedUser[] = users
         .map((user: any) => {
           const profile = profilesMap.get(user.id);
 
@@ -165,21 +230,44 @@ serve(async (req) => {
             last_sign_in_at: user.last_sign_in_at ?? null,
           };
         })
-        .filter((item: any) => {
-          if (!search) return true;
+        .filter((item) => {
+          if (search) {
+            const email = item.email.toLowerCase();
+            const name = item.name.toLowerCase();
+            const phone = item.phone?.toLowerCase() ?? "";
 
-          return (
-            item.email.toLowerCase().includes(search) ||
-            item.name.toLowerCase().includes(search)
-          );
+            const matchesSearch =
+              email.includes(search) ||
+              name.includes(search) ||
+              phone.includes(search);
+
+            if (!matchesSearch) {
+              return false;
+            }
+          }
+
+          return matchesFilter(item, filter);
         })
-        .sort((a: any, b: any) => {
+        .sort((a, b) => {
           const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
           const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
           return dateB - dateA;
         });
 
-      return jsonResponse(corsHeaders, { users: merged });
+      const total = merged.length;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const safePage = Math.min(page, totalPages);
+      const from = (safePage - 1) * pageSize;
+      const to = from + pageSize;
+      const paginatedUsers = merged.slice(from, to);
+
+      return jsonResponse(corsHeaders, {
+        users: paginatedUsers,
+        total,
+        page: safePage,
+        pageSize,
+        totalPages,
+      });
     }
 
     if (body.action === "get_global_settings") {
@@ -269,7 +357,6 @@ serve(async (req) => {
       }
 
       const profiles = await usersResponse.json();
-
       const targetProfiles = profiles.filter((item: any) => !item.is_admin);
 
       for (const profile of targetProfiles) {

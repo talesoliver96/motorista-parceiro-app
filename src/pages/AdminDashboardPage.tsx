@@ -95,12 +95,12 @@ export function AdminDashboardPage() {
       const [nextMetrics, nextPolicy, nextUsers] = await Promise.all([
         adminProService.getMetrics(),
         adminProService.getNewUserPremiumPolicy(),
-        adminProService.listUsers(""),
+        adminProService.listUsers("", 1, 1000, "all"),
       ]);
 
       setMetrics(nextMetrics ?? emptyMetrics);
       setPolicy(nextPolicy ?? emptyPolicy);
-      setUsers(nextUsers);
+      setUsers(nextUsers.items);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao carregar dashboard admin", {
