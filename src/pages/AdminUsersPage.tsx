@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import {
@@ -27,14 +28,17 @@ import { useSnackbar } from "notistack";
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { AppDialog } from "../components/common/AppDialog";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { useAuth } from "../app/providers/AuthProvider";
-import { adminService } from "../features/admin/admin.service";
+import { adminProService } from "../features/admin/admin.pro.service";
 import type {
+  AdminMetrics,
   AdminUserListItem,
   AdminUserUpdatePayload,
 } from "../features/admin/admin.types";
 import {
   formatAdminDate,
+  getBlockedLabel,
   getPremiumLabel,
   isAdminProfile,
 } from "../features/admin/admin.utils";
@@ -50,6 +54,7 @@ const adminUserSchema = z
     premiumDays: z.coerce.number().optional(),
     premiumUntil: z.string().optional(),
     isAdmin: z.boolean(),
+    isBlocked: z.boolean(),
   })
   .superRefine((values, ctx) => {
     if (values.password?.trim() && values.password.trim().length < 6) {
@@ -82,6 +87,16 @@ const adminUserSchema = z
 
 type AdminUserFormValues = z.infer<typeof adminUserSchema>;
 
+const emptyMetrics: AdminMetrics = {
+  totalUsers: 0,
+  premiumUsers: 0,
+  adminUsers: 0,
+  blockedUsers: 0,
+  usersCreatedToday: 0,
+  usersCreatedLast7Days: 0,
+  usersLoggedRecently: 0,
+};
+
 export function AdminUsersPage() {
   const { profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
@@ -90,10 +105,16 @@ export function AdminUsersPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
+  const [metrics, setMetrics] = useState<AdminMetrics>(emptyMetrics);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUserListItem | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<AdminUserListItem | null>(null);
 
   const {
     register,
@@ -113,16 +134,23 @@ export function AdminUsersPage() {
       premiumDays: undefined,
       premiumUntil: "",
       isAdmin: false,
+      isBlocked: false,
     },
   });
 
   const premiumMode = watch("premiumMode");
 
-  const loadUsers = async (nextSearch = search) => {
+  const loadData = async (nextSearch = search) => {
     try {
       setLoading(true);
-      const data = await adminService.listUsers(nextSearch);
-      setUsers(data);
+
+      const [usersData, metricsData] = await Promise.all([
+        adminProService.listUsers(nextSearch),
+        adminProService.getMetrics(),
+      ]);
+
+      setUsers(usersData);
+      setMetrics(metricsData ?? emptyMetrics);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao carregar usuários", {
@@ -139,7 +167,7 @@ export function AdminUsersPage() {
       return;
     }
 
-    void loadUsers("");
+    void loadData("");
   }, [isAdmin]);
 
   const openEditDialog = (user: AdminUserListItem) => {
@@ -152,13 +180,17 @@ export function AdminUsersPage() {
       password: "",
       premiumMode: user.premium ? "until_date" : "free",
       premiumDays: undefined,
-      premiumUntil: user.premium_until
-        ? user.premium_until.slice(0, 10)
-        : "",
+      premiumUntil: user.premium_until ? user.premium_until.slice(0, 10) : "",
       isAdmin: user.is_admin,
+      isBlocked: user.is_blocked,
     });
 
     setDialogOpen(true);
+  };
+
+  const handleDeleteRequest = (user: AdminUserListItem) => {
+    setUserToDelete(user);
+    setDeleteOpen(true);
   };
 
   const onSubmit = async (values: AdminUserFormValues) => {
@@ -177,9 +209,10 @@ export function AdminUsersPage() {
         premiumDays: values.premiumDays,
         premiumUntil: values.premiumUntil,
         isAdmin: values.isAdmin,
+        isBlocked: values.isBlocked,
       };
 
-      await adminService.updateUser(payload);
+      await adminProService.updateUser(payload);
 
       enqueueSnackbar("Usuário atualizado com sucesso", {
         variant: "success",
@@ -187,7 +220,7 @@ export function AdminUsersPage() {
 
       setDialogOpen(false);
       setSelectedUser(null);
-      await loadUsers();
+      await loadData();
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao atualizar usuário", {
@@ -198,14 +231,35 @@ export function AdminUsersPage() {
     }
   };
 
-  const totals = useMemo(() => {
-    const premiumCount = users.filter((item) => item.premium).length;
-    const adminCount = users.filter((item) => item.is_admin).length;
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
 
+    try {
+      setDeleting(true);
+      await adminProService.deleteUser(userToDelete.id);
+
+      enqueueSnackbar("Usuário excluído com sucesso", {
+        variant: "success",
+      });
+
+      setDeleteOpen(false);
+      setUserToDelete(null);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao excluir usuário", {
+        variant: "error",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const totals = useMemo(() => {
     return {
       total: users.length,
-      premium: premiumCount,
-      admin: adminCount,
+      premium: users.filter((item) => item.premium).length,
+      admin: users.filter((item) => item.is_admin).length,
     };
   }, [users]);
 
@@ -226,7 +280,7 @@ export function AdminUsersPage() {
         <Stack spacing={0.5}>
           <Typography variant="h4">Administração de usuários</Typography>
           <Typography color="text.secondary">
-            Gerencie conta, premium, senha, email e permissões dos usuários.
+            Gerencie conta, premium, senha, e-mail, bloqueio e permissões dos usuários.
           </Typography>
         </Stack>
 
@@ -235,30 +289,66 @@ export function AdminUsersPage() {
         </Alert>
 
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
                 Total de usuários
               </Typography>
-              <Typography variant="h5">{totals.total}</Typography>
+              <Typography variant="h5">{metrics.totalUsers || totals.total}</Typography>
             </AppCard>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
                 Usuários premium
               </Typography>
-              <Typography variant="h5">{totals.premium}</Typography>
+              <Typography variant="h5">{metrics.premiumUsers || totals.premium}</Typography>
+            </AppCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 3 }}>
+            <AppCard>
+              <Typography variant="body2" color="text.secondary">
+                Administradores
+              </Typography>
+              <Typography variant="h5">{metrics.adminUsers || totals.admin}</Typography>
+            </AppCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 3 }}>
+            <AppCard>
+              <Typography variant="body2" color="text.secondary">
+                Bloqueados
+              </Typography>
+              <Typography variant="h5">{metrics.blockedUsers}</Typography>
             </AppCard>
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
             <AppCard>
               <Typography variant="body2" color="text.secondary">
-                Administradores
+                Criados hoje
               </Typography>
-              <Typography variant="h5">{totals.admin}</Typography>
+              <Typography variant="h5">{metrics.usersCreatedToday}</Typography>
+            </AppCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 4 }}>
+            <AppCard>
+              <Typography variant="body2" color="text.secondary">
+                Criados nos últimos 7 dias
+              </Typography>
+              <Typography variant="h5">{metrics.usersCreatedLast7Days}</Typography>
+            </AppCard>
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 4 }}>
+            <AppCard>
+              <Typography variant="body2" color="text.secondary">
+                Logaram recentemente
+              </Typography>
+              <Typography variant="h5">{metrics.usersLoggedRecently}</Typography>
             </AppCard>
           </Grid>
         </Grid>
@@ -284,7 +374,7 @@ export function AdminUsersPage() {
               }}
             />
 
-            <Button variant="contained" onClick={() => loadUsers(search)}>
+            <Button variant="contained" onClick={() => loadData(search)}>
               Buscar
             </Button>
           </Stack>
@@ -302,6 +392,7 @@ export function AdminUsersPage() {
                     <TableCell>E-mail</TableCell>
                     <TableCell>Telefone</TableCell>
                     <TableCell>Status</TableCell>
+                    <TableCell>Conta</TableCell>
                     <TableCell>Admin</TableCell>
                     <TableCell>Criado em</TableCell>
                     <TableCell>Último login</TableCell>
@@ -315,6 +406,14 @@ export function AdminUsersPage() {
                       <TableCell>{user.name || "-"}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.phone || "-"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={getBlockedLabel(user.is_blocked)}
+                          color={user.is_blocked ? "error" : "success"}
+                          variant={user.is_blocked ? "filled" : "outlined"}
+                        />
+                      </TableCell>
                       <TableCell>
                         <Chip
                           size="small"
@@ -334,16 +433,25 @@ export function AdminUsersPage() {
                       <TableCell>{formatAdminDate(user.created_at)}</TableCell>
                       <TableCell>{formatAdminDate(user.last_sign_in_at)}</TableCell>
                       <TableCell align="right">
-                        <IconButton onClick={() => openEditDialog(user)}>
-                          <EditRoundedIcon />
-                        </IconButton>
+                        <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
+                          <IconButton onClick={() => openEditDialog(user)}>
+                            <EditRoundedIcon />
+                          </IconButton>
+
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDeleteRequest(user)}
+                          >
+                            <DeleteRoundedIcon />
+                          </IconButton>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   ))}
 
                   {!users.length ? (
                     <TableRow>
-                      <TableCell colSpan={8}>
+                      <TableCell colSpan={9}>
                         <Typography color="text.secondary">
                           Nenhum usuário encontrado.
                         </Typography>
@@ -489,9 +597,40 @@ export function AdminUsersPage() {
                 )}
               />
             </Grid>
+
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Controller
+                name="isBlocked"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    select
+                    label="Status do usuário"
+                    value={field.value ? "blocked" : "active"}
+                    onChange={(e) => field.onChange(e.target.value === "blocked")}
+                  >
+                    <MenuItem value="active">Ativo</MenuItem>
+                    <MenuItem value="blocked">Bloqueado</MenuItem>
+                  </TextField>
+                )}
+              />
+            </Grid>
           </Grid>
         </Stack>
       </AppDialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        loading={deleting}
+        title="Excluir usuário"
+        description="Tem certeza que deseja excluir este usuário? Essa ação apaga login, perfil, ganhos, gastos e mensagens relacionadas."
+        onClose={() => {
+          if (deleting) return;
+          setDeleteOpen(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+      />
     </PageContainer>
   );
 }

@@ -8,6 +8,7 @@ export type Profile = {
   premium_forever: boolean;
   premium_until: string | null;
   is_admin: boolean;
+  is_blocked: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -38,4 +39,13 @@ export type Expense = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AdminAction = {
+  id: string;
+  admin_user_id: string;
+  target_user_id: string | null;
+  action: string;
+  details: Record<string, unknown>;
+  created_at: string;
 };

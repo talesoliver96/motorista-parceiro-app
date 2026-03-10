@@ -17,6 +17,12 @@ export function getPremiumLabel(params: {
 }) {
   if (!params.premium) return "Free";
   if (params.premium_forever) return "Premium";
-  if (params.premium_until) return `Premium até ${dayjs(params.premium_until).format("DD/MM/YYYY")}`;
+  if (params.premium_until) {
+    return `Premium até ${dayjs(params.premium_until).format("DD/MM/YYYY")}`;
+  }
   return "Premium";
+}
+
+export function getBlockedLabel(isBlocked: boolean) {
+  return isBlocked ? "Bloqueado" : "Ativo";
 }
