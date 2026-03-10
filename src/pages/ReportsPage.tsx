@@ -68,7 +68,7 @@ const pieColors = [
 ];
 
 export function ReportsPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
   const isPremium = isPremiumProfile(profile);
@@ -83,7 +83,7 @@ export function ReportsPage() {
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user || !isPremium) {
+    if (!isPremium) {
       setLoading(false);
       setData(emptyReportsData);
       return;
@@ -95,11 +95,7 @@ export function ReportsPage() {
       try {
         setLoading(true);
 
-        const result = await reportsService.getReportsData(
-          user.id,
-          startDate,
-          endDate
-        );
+        const result = await reportsService.getReportsData(startDate, endDate);
 
         if (cancelled) return;
         setData(result);
@@ -123,7 +119,7 @@ export function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user, isPremium, startDate, endDate, enqueueSnackbar]);
+  }, [authLoading, isPremium, startDate, endDate, enqueueSnackbar]);
 
   return (
     <PageContainer>

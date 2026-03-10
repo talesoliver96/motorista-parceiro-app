@@ -37,12 +37,15 @@ export function AdminActionLogsCard({ items }: Props) {
                 <Typography variant="body2" fontWeight={700}>
                   {getActionLabel(item.action)}
                 </Typography>
+
                 <Typography variant="caption" color="text.secondary">
-                  Admin: {item.admin_user_id}
+                  Admin ID: {item.admin_user_id}
                 </Typography>
+
                 <Typography variant="caption" color="text.secondary">
-                  Alvo: {item.target_user_id || "-"}
+                  Alvo ID: {item.target_user_id || "-"}
                 </Typography>
+
                 <Typography variant="caption" color="text.secondary">
                   {formatAdminDate(item.created_at)}
                 </Typography>

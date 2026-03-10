@@ -11,6 +11,7 @@ import {
   IconButton,
   InputAdornment,
   MenuItem,
+  Pagination,
   Stack,
   Table,
   TableBody,
@@ -86,6 +87,7 @@ const adminUserSchema = z
   });
 
 type AdminUserFormValues = z.infer<typeof adminUserSchema>;
+type FilterType = "all" | "premium" | "free" | "admins" | "blocked";
 
 const emptyMetrics: AdminMetrics = {
   totalUsers: 0,
@@ -97,6 +99,8 @@ const emptyMetrics: AdminMetrics = {
   usersLoggedRecently: 0,
 };
 
+const PAGE_SIZE = 10;
+
 export function AdminUsersPage() {
   const { profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
@@ -107,6 +111,9 @@ export function AdminUsersPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [page, setPage] = useState(1);
+
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
   const [metrics, setMetrics] = useState<AdminMetrics>(emptyMetrics);
 
@@ -115,6 +122,7 @@ export function AdminUsersPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AdminUserListItem | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const {
     register,
@@ -170,6 +178,32 @@ export function AdminUsersPage() {
     void loadData("");
   }, [isAdmin]);
 
+  const filteredUsers = useMemo(() => {
+    switch (filter) {
+      case "premium":
+        return users.filter((item) => item.premium);
+      case "free":
+        return users.filter((item) => !item.premium);
+      case "admins":
+        return users.filter((item) => item.is_admin);
+      case "blocked":
+        return users.filter((item) => item.is_blocked);
+      default:
+        return users;
+    }
+  }, [users, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+
+  const paginatedUsers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredUsers.slice(start, start + PAGE_SIZE);
+  }, [filteredUsers, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, filter]);
+
   const openEditDialog = (user: AdminUserListItem) => {
     setSelectedUser(user);
 
@@ -190,6 +224,7 @@ export function AdminUsersPage() {
 
   const handleDeleteRequest = (user: AdminUserListItem) => {
     setUserToDelete(user);
+    setDeleteConfirmText("");
     setDeleteOpen(true);
   };
 
@@ -233,6 +268,12 @@ export function AdminUsersPage() {
 
   const handleConfirmDelete = async () => {
     if (!userToDelete) return;
+    if (deleteConfirmText.trim() !== userToDelete.email.trim()) {
+      enqueueSnackbar("Digite o e-mail exato do usuário para confirmar", {
+        variant: "warning",
+      });
+      return;
+    }
 
     try {
       setDeleting(true);
@@ -244,6 +285,7 @@ export function AdminUsersPage() {
 
       setDeleteOpen(false);
       setUserToDelete(null);
+      setDeleteConfirmText("");
       await loadData();
     } catch (error) {
       console.error(error);
@@ -254,14 +296,6 @@ export function AdminUsersPage() {
       setDeleting(false);
     }
   };
-
-  const totals = useMemo(() => {
-    return {
-      total: users.length,
-      premium: users.filter((item) => item.premium).length,
-      admin: users.filter((item) => item.is_admin).length,
-    };
-  }, [users]);
 
   if (!isAdmin) {
     return (
@@ -294,7 +328,7 @@ export function AdminUsersPage() {
               <Typography variant="body2" color="text.secondary">
                 Total de usuários
               </Typography>
-              <Typography variant="h5">{metrics.totalUsers || totals.total}</Typography>
+              <Typography variant="h5">{metrics.totalUsers}</Typography>
             </AppCard>
           </Grid>
 
@@ -303,7 +337,7 @@ export function AdminUsersPage() {
               <Typography variant="body2" color="text.secondary">
                 Usuários premium
               </Typography>
-              <Typography variant="h5">{metrics.premiumUsers || totals.premium}</Typography>
+              <Typography variant="h5">{metrics.premiumUsers}</Typography>
             </AppCard>
           </Grid>
 
@@ -312,7 +346,7 @@ export function AdminUsersPage() {
               <Typography variant="body2" color="text.secondary">
                 Administradores
               </Typography>
-              <Typography variant="h5">{metrics.adminUsers || totals.admin}</Typography>
+              <Typography variant="h5">{metrics.adminUsers}</Typography>
             </AppCard>
           </Grid>
 
@@ -324,144 +358,142 @@ export function AdminUsersPage() {
               <Typography variant="h5">{metrics.blockedUsers}</Typography>
             </AppCard>
           </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <AppCard>
-              <Typography variant="body2" color="text.secondary">
-                Criados hoje
-              </Typography>
-              <Typography variant="h5">{metrics.usersCreatedToday}</Typography>
-            </AppCard>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <AppCard>
-              <Typography variant="body2" color="text.secondary">
-                Criados nos últimos 7 dias
-              </Typography>
-              <Typography variant="h5">{metrics.usersCreatedLast7Days}</Typography>
-            </AppCard>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 4 }}>
-            <AppCard>
-              <Typography variant="body2" color="text.secondary">
-                Logaram recentemente
-              </Typography>
-              <Typography variant="h5">{metrics.usersLoggedRecently}</Typography>
-            </AppCard>
-          </Grid>
         </Grid>
 
         <AppCard>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            justifyContent="space-between"
-          >
-            <TextField
-              label="Buscar usuário"
-              placeholder="Digite nome ou e-mail"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              sx={{ maxWidth: 420, width: "100%" }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRoundedIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
+          <Stack spacing={2}>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={2}
+              justifyContent="space-between"
+            >
+              <TextField
+                label="Buscar usuário"
+                placeholder="Digite nome ou e-mail"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                sx={{ maxWidth: 420, width: "100%" }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
 
-            <Button variant="contained" onClick={() => loadData(search)}>
-              Buscar
-            </Button>
+              <TextField
+                select
+                label="Filtro"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as FilterType)}
+                sx={{ minWidth: 180 }}
+              >
+                <MenuItem value="all">Todos</MenuItem>
+                <MenuItem value="premium">Premium</MenuItem>
+                <MenuItem value="free">Free</MenuItem>
+                <MenuItem value="admins">Admins</MenuItem>
+                <MenuItem value="blocked">Bloqueados</MenuItem>
+              </TextField>
+
+              <Button variant="contained" onClick={() => loadData(search)}>
+                Buscar
+              </Button>
+            </Stack>
+
+            {loading ? (
+              <Typography>Carregando usuários...</Typography>
+            ) : (
+              <>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Nome</TableCell>
+                        <TableCell>E-mail</TableCell>
+                        <TableCell>Telefone</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Conta</TableCell>
+                        <TableCell>Admin</TableCell>
+                        <TableCell>Criado em</TableCell>
+                        <TableCell>Último login</TableCell>
+                        <TableCell align="right">Ações</TableCell>
+                      </TableRow>
+                    </TableHead>
+
+                    <TableBody>
+                      {paginatedUsers.map((user) => (
+                        <TableRow key={user.id} hover>
+                          <TableCell>{user.name || "-"}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>{user.phone || "-"}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={getBlockedLabel(user.is_blocked)}
+                              color={user.is_blocked ? "error" : "success"}
+                              variant={user.is_blocked ? "filled" : "outlined"}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={getPremiumLabel(user)}
+                              color={user.premium ? "success" : "default"}
+                              variant={user.premium ? "filled" : "outlined"}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={user.is_admin ? "Sim" : "Não"}
+                              color={user.is_admin ? "warning" : "default"}
+                              variant={user.is_admin ? "filled" : "outlined"}
+                            />
+                          </TableCell>
+                          <TableCell>{formatAdminDate(user.created_at)}</TableCell>
+                          <TableCell>{formatAdminDate(user.last_sign_in_at)}</TableCell>
+                          <TableCell align="right">
+                            <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
+                              <IconButton onClick={() => openEditDialog(user)}>
+                                <EditRoundedIcon />
+                              </IconButton>
+
+                              <IconButton
+                                color="error"
+                                onClick={() => handleDeleteRequest(user)}
+                              >
+                                <DeleteRoundedIcon />
+                              </IconButton>
+                            </Stack>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+
+                      {!paginatedUsers.length ? (
+                        <TableRow>
+                          <TableCell colSpan={9}>
+                            <Typography color="text.secondary">
+                              Nenhum usuário encontrado.
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Stack direction="row" justifyContent="flex-end">
+                  <Pagination
+                    page={page}
+                    count={totalPages}
+                    onChange={(_, value) => setPage(value)}
+                    color="primary"
+                  />
+                </Stack>
+              </>
+            )}
           </Stack>
-        </AppCard>
-
-        <AppCard>
-          {loading ? (
-            <Typography>Carregando usuários...</Typography>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Nome</TableCell>
-                    <TableCell>E-mail</TableCell>
-                    <TableCell>Telefone</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Conta</TableCell>
-                    <TableCell>Admin</TableCell>
-                    <TableCell>Criado em</TableCell>
-                    <TableCell>Último login</TableCell>
-                    <TableCell align="right">Ações</TableCell>
-                  </TableRow>
-                </TableHead>
-
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id} hover>
-                      <TableCell>{user.name || "-"}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.phone || "-"}</TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          label={getBlockedLabel(user.is_blocked)}
-                          color={user.is_blocked ? "error" : "success"}
-                          variant={user.is_blocked ? "filled" : "outlined"}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          label={getPremiumLabel(user)}
-                          color={user.premium ? "success" : "default"}
-                          variant={user.premium ? "filled" : "outlined"}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          label={user.is_admin ? "Sim" : "Não"}
-                          color={user.is_admin ? "warning" : "default"}
-                          variant={user.is_admin ? "filled" : "outlined"}
-                        />
-                      </TableCell>
-                      <TableCell>{formatAdminDate(user.created_at)}</TableCell>
-                      <TableCell>{formatAdminDate(user.last_sign_in_at)}</TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" justifyContent="flex-end" spacing={0.5}>
-                          <IconButton onClick={() => openEditDialog(user)}>
-                            <EditRoundedIcon />
-                          </IconButton>
-
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDeleteRequest(user)}
-                          >
-                            <DeleteRoundedIcon />
-                          </IconButton>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-
-                  {!users.length ? (
-                    <TableRow>
-                      <TableCell colSpan={9}>
-                        <Typography color="text.secondary">
-                          Nenhum usuário encontrado.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
         </AppCard>
       </Stack>
 
@@ -623,14 +655,22 @@ export function AdminUsersPage() {
         open={deleteOpen}
         loading={deleting}
         title="Excluir usuário"
-        description="Tem certeza que deseja excluir este usuário? Essa ação apaga login, perfil, ganhos, gastos e mensagens relacionadas."
+        description={`Digite o e-mail do usuário para confirmar a exclusão definitiva: ${userToDelete?.email || ""}`}
         onClose={() => {
           if (deleting) return;
           setDeleteOpen(false);
           setUserToDelete(null);
+          setDeleteConfirmText("");
         }}
         onConfirm={handleConfirmDelete}
-      />
+      >
+        <TextField
+          fullWidth
+          label="Confirme digitando o e-mail"
+          value={deleteConfirmText}
+          onChange={(e) => setDeleteConfirmText(e.target.value)}
+        />
+      </ConfirmDialog>
     </PageContainer>
   );
 }

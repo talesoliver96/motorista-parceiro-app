@@ -1,24 +1,24 @@
-import { Button, Typography } from "@mui/material";
+import { Button, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 import { AppDialog } from "./AppDialog";
 
 type Props = {
   open: boolean;
-  title?: string;
-  description?: string;
   loading?: boolean;
+  title: string;
+  description: string;
   onClose: () => void;
   onConfirm: () => void;
+  children?: React.ReactNode;
 };
 
-// Modal padrão de confirmação.
-// Reutilizado para exclusões.
 export function ConfirmDialog({
   open,
-  title = "Confirmar ação",
-  description = "Tem certeza que deseja continuar?",
   loading = false,
+  title,
+  description,
   onClose,
   onConfirm,
+  children,
 }: Props) {
   return (
     <AppDialog
@@ -26,24 +26,25 @@ export function ConfirmDialog({
       onClose={onClose}
       title={title}
       actions={
-        <>
+        <DialogActions sx={{ px: 0 }}>
           <Button onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button
-            onClick={onConfirm}
-            variant="contained"
-            color="error"
-            disabled={loading}
-          >
-            Excluir
+          <Button onClick={onConfirm} color="error" variant="contained" disabled={loading}>
+            Confirmar
           </Button>
-        </>
+        </DialogActions>
       }
     >
-      <Typography variant="body2" color="text.secondary">
-        {description}
-      </Typography>
+      <DialogTitle sx={{ px: 0, pt: 0 }}>{title}</DialogTitle>
+
+      <DialogContent sx={{ px: 0 }}>
+        <Typography color="text.secondary" sx={{ mb: children ? 2 : 0 }}>
+          {description}
+        </Typography>
+
+        {children}
+      </DialogContent>
     </AppDialog>
   );
 }

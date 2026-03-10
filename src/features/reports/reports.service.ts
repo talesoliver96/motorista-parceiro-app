@@ -1,12 +1,11 @@
-import { supabase } from "../../lib/supabase";
-import type { Earning, Expense } from "../../types/database";
+import type { Earning } from "../../types/database";
 import type { ExpenseListItem } from "../expenses/expenses.types";
-import { buildAutomaticFuelExpenses } from "../expenses/expenses.utils";
 import {
   groupEarningsByWeekday,
   groupExpensesByCategory,
   getTopNetDays,
 } from "./reports.utils";
+import { reportsProService } from "./reports.pro.service";
 
 export type ReportsData = {
   earnings: Earning[];
@@ -31,38 +30,19 @@ export type ReportsData = {
 };
 
 export const reportsService = {
-  async getReportsData(userId: string, startDate: string, endDate: string) {
-    const [earningsResult, expensesResult] = await Promise.all([
-      supabase
-        .from("earnings")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: false }),
-      supabase
-        .from("expenses")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: false }),
-    ]);
+  async getReportsData(startDate: string, endDate: string) {
+    const response = await reportsProService.getPremiumReports(startDate, endDate);
 
-    if (earningsResult.error) throw earningsResult.error;
-    if (expensesResult.error) throw expensesResult.error;
+    const earnings = (response.earnings ?? []) as Earning[];
+    const allExpenses = (response.expenses ?? []) as ExpenseListItem[];
 
-    const earnings = (earningsResult.data ?? []) as Earning[];
-    const manualExpensesRaw = (expensesResult.data ?? []) as Expense[];
+    const manualExpenses = allExpenses.filter(
+      (item) => item.source === "manual"
+    );
 
-    const manualExpenses: ExpenseListItem[] = manualExpensesRaw.map((item) => ({
-      ...item,
-      source: "manual",
-      isReadonly: false,
-    }));
-
-    const automaticFuelExpenses = buildAutomaticFuelExpenses(earnings);
-    const allExpenses = [...manualExpenses, ...automaticFuelExpenses];
+    const automaticFuelExpenses = allExpenses.filter(
+      (item) => item.source === "automatic_fuel"
+    );
 
     const gross = earnings.reduce(
       (acc, item) => acc + Number(item.gross_amount || 0),
