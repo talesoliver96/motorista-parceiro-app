@@ -38,7 +38,43 @@ type DeleteActionBody = {
   userId: string;
 };
 
-type RequestBody = ListActionBody | UpdateActionBody | DeleteActionBody;
+type GetGlobalSettingsActionBody = {
+  action: "get_global_settings";
+};
+
+type SetNewUserPremiumPolicyActionBody = {
+  action: "set_new_user_premium_policy";
+  enabled: boolean;
+  durationDays: number;
+};
+
+type ApplyPremiumToAllActionBody = {
+  action: "apply_premium_to_all";
+  durationDays: number;
+};
+
+type RevokePremiumFromAllActionBody = {
+  action: "revoke_premium_from_all";
+};
+
+type ResetSystemDataActionBody = {
+  action: "reset_system_data";
+};
+
+type ClearAllNonAdminUsersActionBody = {
+  action: "clear_all_non_admin_users";
+};
+
+type RequestBody =
+  | ListActionBody
+  | UpdateActionBody
+  | DeleteActionBody
+  | GetGlobalSettingsActionBody
+  | SetNewUserPremiumPolicyActionBody
+  | ApplyPremiumToAllActionBody
+  | RevokePremiumFromAllActionBody
+  | ResetSystemDataActionBody
+  | ClearAllNonAdminUsersActionBody;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -144,6 +180,280 @@ serve(async (req) => {
         });
 
       return jsonResponse(corsHeaders, { users: merged });
+    }
+
+    if (body.action === "get_global_settings") {
+      const settingsResponse = await fetch(
+        `${supabaseUrl}/rest/v1/app_settings?key=eq.new_user_premium_policy&select=*`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }
+      );
+
+      if (!settingsResponse.ok) {
+        const errorText = await settingsResponse.text();
+        return jsonResponse(corsHeaders, { error: errorText }, 500);
+      }
+
+      const settingsData = await settingsResponse.json();
+      const setting = settingsData?.[0];
+
+      return jsonResponse(corsHeaders, {
+        policy: {
+          enabled: Boolean(setting?.value?.enabled),
+          durationDays: Number(setting?.value?.duration_days ?? 365),
+        },
+      });
+    }
+
+    if (body.action === "set_new_user_premium_policy") {
+      const { enabled, durationDays } = body;
+
+      const updateResponse = await fetch(
+        `${supabaseUrl}/rest/v1/app_settings?key=eq.new_user_premium_policy`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            value: {
+              enabled,
+              duration_days: durationDays,
+            },
+            updated_at: new Date().toISOString(),
+          }),
+        }
+      );
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        return jsonResponse(corsHeaders, { error: errorText }, 500);
+      }
+
+      await logAdminAction({
+        supabaseUrl,
+        serviceRoleKey,
+        adminUserId: adminAuth.user.id,
+        action: "set_new_user_premium_policy",
+        details: {
+          enabled,
+          durationDays,
+        },
+      });
+
+      return jsonResponse(corsHeaders, { success: true });
+    }
+
+    if (body.action === "apply_premium_to_all") {
+      const { durationDays } = body;
+
+      const usersResponse = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?select=id,is_admin`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }
+      );
+
+      if (!usersResponse.ok) {
+        const errorText = await usersResponse.text();
+        return jsonResponse(corsHeaders, { error: errorText }, 500);
+      }
+
+      const profiles = await usersResponse.json();
+
+      const targetProfiles = profiles.filter((item: any) => !item.is_admin);
+
+      for (const profile of targetProfiles) {
+        const premiumUntil = new Date();
+        premiumUntil.setDate(premiumUntil.getDate() + durationDays);
+
+        await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${profile.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            premium: true,
+            premium_forever: false,
+            premium_until: premiumUntil.toISOString(),
+          }),
+        });
+      }
+
+      await logAdminAction({
+        supabaseUrl,
+        serviceRoleKey,
+        adminUserId: adminAuth.user.id,
+        action: "apply_premium_to_all",
+        details: {
+          durationDays,
+        },
+      });
+
+      return jsonResponse(corsHeaders, { success: true });
+    }
+
+    if (body.action === "revoke_premium_from_all") {
+      const updateResponse = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?is_admin=eq.false`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            premium: false,
+            premium_forever: false,
+            premium_until: null,
+          }),
+        }
+      );
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        return jsonResponse(corsHeaders, { error: errorText }, 500);
+      }
+
+      await logAdminAction({
+        supabaseUrl,
+        serviceRoleKey,
+        adminUserId: adminAuth.user.id,
+        action: "revoke_premium_from_all",
+        details: {},
+      });
+
+      return jsonResponse(corsHeaders, { success: true });
+    }
+
+    if (body.action === "reset_system_data") {
+      await fetch(`${supabaseUrl}/rest/v1/earnings?id=not.is.null`, {
+        method: "DELETE",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+
+      await fetch(`${supabaseUrl}/rest/v1/expenses?id=not.is.null`, {
+        method: "DELETE",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+
+      await fetch(`${supabaseUrl}/rest/v1/contact_messages?id=not.is.null`, {
+        method: "DELETE",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+
+      await fetch(`${supabaseUrl}/rest/v1/admin_actions?id=not.is.null`, {
+        method: "DELETE",
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      });
+
+      await logAdminAction({
+        supabaseUrl,
+        serviceRoleKey,
+        adminUserId: adminAuth.user.id,
+        action: "reset_system_data",
+        details: {},
+      });
+
+      return jsonResponse(corsHeaders, { success: true });
+    }
+
+    if (body.action === "clear_all_non_admin_users") {
+      const profilesResponse = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?select=id,is_admin`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }
+      );
+
+      if (!profilesResponse.ok) {
+        const errorText = await profilesResponse.text();
+        return jsonResponse(corsHeaders, { error: errorText }, 500);
+      }
+
+      const profiles = await profilesResponse.json();
+      const targetProfiles = profiles.filter((item: any) => !item.is_admin);
+
+      for (const profile of targetProfiles) {
+        const userId = profile.id;
+
+        await fetch(`${supabaseUrl}/rest/v1/contact_messages?user_id=eq.${userId}`, {
+          method: "DELETE",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        });
+
+        await fetch(`${supabaseUrl}/rest/v1/earnings?user_id=eq.${userId}`, {
+          method: "DELETE",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        });
+
+        await fetch(`${supabaseUrl}/rest/v1/expenses?user_id=eq.${userId}`, {
+          method: "DELETE",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        });
+
+        await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {
+          method: "DELETE",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        });
+
+        await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+          method: "DELETE",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        });
+      }
+
+      await logAdminAction({
+        supabaseUrl,
+        serviceRoleKey,
+        adminUserId: adminAuth.user.id,
+        action: "clear_all_non_admin_users",
+        details: {},
+      });
+
+      return jsonResponse(corsHeaders, { success: true });
     }
 
     if (body.action === "update") {

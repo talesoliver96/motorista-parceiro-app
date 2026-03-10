@@ -43,3 +43,8 @@ export type AdminActionLogItem = {
   details: Record<string, unknown>;
   created_at: string;
 };
+
+export type NewUserPremiumPolicy = {
+  enabled: boolean;
+  durationDays: number;
+};

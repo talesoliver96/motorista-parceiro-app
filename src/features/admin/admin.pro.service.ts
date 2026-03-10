@@ -4,6 +4,7 @@ import type {
   AdminMetrics,
   AdminUserListItem,
   AdminUserUpdatePayload,
+  NewUserPremiumPolicy,
 } from "./admin.types";
 
 async function getAccessToken() {
@@ -83,5 +84,49 @@ export const adminProService = {
     if (error) throw error;
 
     return (data ?? []) as AdminActionLogItem[];
+  },
+
+  async getNewUserPremiumPolicy(): Promise<NewUserPremiumPolicy> {
+    const data = await callFunction("admin-users-pro", {
+      action: "get_global_settings",
+    });
+
+    return {
+      enabled: Boolean(data?.policy?.enabled),
+      durationDays: Number(data?.policy?.durationDays ?? 365),
+    };
+  },
+
+  async setNewUserPremiumPolicy(enabled: boolean, durationDays: number) {
+    return await callFunction("admin-users-pro", {
+      action: "set_new_user_premium_policy",
+      enabled,
+      durationDays,
+    });
+  },
+
+  async applyPremiumToAll(durationDays: number) {
+    return await callFunction("admin-users-pro", {
+      action: "apply_premium_to_all",
+      durationDays,
+    });
+  },
+
+  async revokePremiumFromAll() {
+    return await callFunction("admin-users-pro", {
+      action: "revoke_premium_from_all",
+    });
+  },
+
+  async resetSystemData() {
+    return await callFunction("admin-users-pro", {
+      action: "reset_system_data",
+    });
+  },
+
+  async clearAllNonAdminUsers() {
+    return await callFunction("admin-users-pro", {
+      action: "clear_all_non_admin_users",
+    });
   },
 };
