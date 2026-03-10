@@ -4,6 +4,34 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@16.10.0";
 import { logPremiumHistory } from "../_shared/auth.ts";
 
+function addDaysIso(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
+async function updateProfilePremium(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  userId: string;
+  premium: boolean;
+  premiumUntil: string | null;
+}) {
+  await fetch(`${params.supabaseUrl}/rest/v1/profiles?id=eq.${params.userId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: params.serviceRoleKey,
+      Authorization: `Bearer ${params.serviceRoleKey}`,
+    },
+    body: JSON.stringify({
+      premium: params.premium,
+      premium_forever: false,
+      premium_until: params.premiumUntil,
+    }),
+  });
+}
+
 serve(async (req) => {
   try {
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -32,40 +60,84 @@ serve(async (req) => {
       stripeWebhookSecret
     );
 
-    if (
-      event.type === "checkout.session.completed" ||
-      event.type === "customer.subscription.created" ||
-      event.type === "customer.subscription.updated"
-    ) {
-      const obj: any = event.data.object;
-      const userId =
-        obj.metadata?.user_id ||
-        obj?.items?.data?.[0]?.price?.metadata?.user_id ||
-        null;
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const paymentFlow = session.metadata?.payment_flow;
+      const userId = session.metadata?.user_id;
+      const planCode = session.metadata?.plan_code ?? "monthly";
 
-      const planCode =
-        obj.metadata?.plan_code ||
-        obj?.items?.data?.[0]?.price?.metadata?.plan_code ||
-        "monthly";
+      if (paymentFlow === "pix_one_time" && userId && session.payment_status === "paid") {
+        const premiumDays = Number(session.metadata?.premium_days ?? 30);
+        const premiumUntil = addDaysIso(premiumDays);
 
-      if (userId) {
-        const expiresAt =
-          obj.current_period_end
-            ? new Date(obj.current_period_end * 1000).toISOString()
-            : null;
+        await updateProfilePremium({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          premium: true,
+          premiumUntil,
+        });
 
-        await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`, {
-          method: "PATCH",
+        await fetch(`${supabaseUrl}/rest/v1/user_subscriptions`, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             apikey: serviceRoleKey,
             Authorization: `Bearer ${serviceRoleKey}`,
           },
           body: JSON.stringify({
-            premium: true,
-            premium_forever: false,
-            premium_until: expiresAt,
+            user_id: userId,
+            provider: "stripe",
+            provider_customer_id: session.customer ?? null,
+            provider_subscription_id: session.id,
+            plan_code: `${planCode}_pix`,
+            status: "active",
+            amount: session.amount_total ? session.amount_total / 100 : null,
+            currency: (session.currency || "brl").toUpperCase(),
+            started_at: new Date().toISOString(),
+            expires_at: premiumUntil,
+            updated_at: new Date().toISOString(),
           }),
+        });
+
+        await logPremiumHistory({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          adminUserId: null,
+          action: "pix_payment_approved",
+          oldPremium: false,
+          newPremium: true,
+          oldPremiumUntil: null,
+          newPremiumUntil: premiumUntil,
+          details: {
+            provider: "stripe",
+            flow: "pix_one_time",
+            planCode,
+          },
+        });
+      }
+    }
+
+    if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated"
+    ) {
+      const subscription = event.data.object as Stripe.Subscription;
+      const userId = subscription.metadata?.user_id;
+      const planCode = subscription.metadata?.plan_code ?? "monthly";
+
+      if (userId) {
+        const premiumUntil = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null;
+
+        await updateProfilePremium({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          premium: true,
+          premiumUntil,
         });
 
         await fetch(`${supabaseUrl}/rest/v1/user_subscriptions`, {
@@ -79,14 +151,14 @@ serve(async (req) => {
           body: JSON.stringify({
             user_id: userId,
             provider: "stripe",
-            provider_customer_id: obj.customer ?? null,
-            provider_subscription_id: obj.subscription ?? obj.id ?? null,
+            provider_customer_id: subscription.customer ?? null,
+            provider_subscription_id: subscription.id,
             plan_code: planCode,
-            status: "active",
+            status: subscription.status,
             amount: null,
             currency: "BRL",
             started_at: new Date().toISOString(),
-            expires_at: expiresAt,
+            expires_at: premiumUntil,
             updated_at: new Date().toISOString(),
           }),
         });
@@ -100,9 +172,10 @@ serve(async (req) => {
           oldPremium: false,
           newPremium: true,
           oldPremiumUntil: null,
-          newPremiumUntil: expiresAt,
+          newPremiumUntil: premiumUntil,
           details: {
             provider: "stripe",
+            flow: "card_subscription",
             planCode,
           },
         });
@@ -110,10 +183,10 @@ serve(async (req) => {
     }
 
     if (event.type === "customer.subscription.deleted") {
-      const obj: any = event.data.object;
-      const subscriptionId = obj.id;
+      const subscription = event.data.object as Stripe.Subscription;
+      const subscriptionId = subscription.id;
 
-      const subscriptionLookup = await fetch(
+      const lookup = await fetch(
         `${supabaseUrl}/rest/v1/user_subscriptions?provider_subscription_id=eq.${subscriptionId}&select=*`,
         {
           headers: {
@@ -123,22 +196,16 @@ serve(async (req) => {
         }
       );
 
-      const subscriptions = await subscriptionLookup.json();
-      const subscription = subscriptions?.[0];
+      const rows = await lookup.json();
+      const existing = rows?.[0];
 
-      if (subscription?.user_id) {
-        await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${subscription.user_id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-          },
-          body: JSON.stringify({
-            premium: false,
-            premium_forever: false,
-            premium_until: null,
-          }),
+      if (existing?.user_id) {
+        await updateProfilePremium({
+          supabaseUrl,
+          serviceRoleKey,
+          userId: existing.user_id,
+          premium: false,
+          premiumUntil: null,
         });
 
         await fetch(
@@ -161,15 +228,16 @@ serve(async (req) => {
         await logPremiumHistory({
           supabaseUrl,
           serviceRoleKey,
-          userId: subscription.user_id,
+          userId: existing.user_id,
           adminUserId: null,
           action: "subscription_canceled",
           oldPremium: true,
           newPremium: false,
-          oldPremiumUntil: subscription.expires_at ?? null,
+          oldPremiumUntil: existing.expires_at ?? null,
           newPremiumUntil: null,
           details: {
             provider: "stripe",
+            flow: "card_subscription",
           },
         });
       }
