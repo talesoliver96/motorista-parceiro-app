@@ -1,11 +1,16 @@
-import { Divider, Stack, Typography } from "@mui/material";
+import { Divider, Pagination, Stack, Typography } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
+
 import { AppCard } from "../../../components/common/AppCard";
+import { getTotalPages, paginateArray } from "../../../utils/pagination";
 import type { AdminActionLogItem } from "../admin.types";
 import { formatAdminDate } from "../admin.utils";
 
 type Props = {
   items: AdminActionLogItem[];
 };
+
+const PAGE_SIZE = 10;
 
 function getActionLabel(action: string) {
   switch (action) {
@@ -29,41 +34,67 @@ function getActionLabel(action: string) {
 }
 
 export function AdminActionLogsCard({ items }: Props) {
-  return (
-    <AppCard sx={{ height: "100%" }}>
-      <Typography variant="h6" gutterBottom>
-        Logs recentes de administração
-      </Typography>
+  const [page, setPage] = useState(1);
 
-      <Stack spacing={1.5}>
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
+
+  const totalPages = useMemo(
+    () => getTotalPages(items.length, PAGE_SIZE),
+    [items.length]
+  );
+
+  const paginatedItems = useMemo(
+    () => paginateArray(items, page, PAGE_SIZE),
+    [items, page]
+  );
+
+  return (
+    <AppCard>
+      <Stack spacing={2}>
+        <Typography variant="h6">Logs recentes de administração</Typography>
+
         {!items.length ? (
           <Typography variant="body2" color="text.secondary">
             Nenhuma ação administrativa recente.
           </Typography>
         ) : (
-          items.map((item, index) => (
-            <Stack key={item.id} spacing={1}>
-              <Stack spacing={0.3}>
-                <Typography variant="body2" fontWeight={700}>
-                  {getActionLabel(item.action)}
-                </Typography>
+          <>
+            <Stack divider={<Divider flexItem />}>
+              {paginatedItems.map((item) => (
+                <Stack key={item.id} spacing={0.5} py={1}>
+                  <Typography variant="subtitle2">
+                    {getActionLabel(item.action)}
+                  </Typography>
 
-                <Typography variant="caption" color="text.secondary">
-                  Admin: {item.admin_name || item.admin_user_id}
-                </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Admin: {item.admin_name || item.admin_user_id}
+                  </Typography>
 
-                <Typography variant="caption" color="text.secondary">
-                  Alvo: {item.target_name || item.target_user_id || "-"}
-                </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Alvo: {item.target_name || item.target_user_id || "-"}
+                  </Typography>
 
-                <Typography variant="caption" color="text.secondary">
-                  {formatAdminDate(item.created_at)}
-                </Typography>
-              </Stack>
-
-              {index < items.length - 1 ? <Divider /> : null}
+                  <Typography variant="caption" color="text.secondary">
+                    {formatAdminDate(item.created_at)}
+                  </Typography>
+                </Stack>
+              ))}
             </Stack>
-          ))
+
+            {totalPages > 1 ? (
+              <Stack alignItems="center">
+                <Pagination
+                  page={page}
+                  count={totalPages}
+                  onChange={(_, value) => setPage(value)}
+                  color="primary"
+                  size="small"
+                />
+              </Stack>
+            ) : null}
+          </>
         )}
       </Stack>
     </AppCard>
