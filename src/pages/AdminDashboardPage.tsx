@@ -11,7 +11,9 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useSnackbar } from "notistack";
+
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { AppSkeleton } from "../components/common/AppSkeleton";
@@ -29,9 +31,7 @@ import type {
 import { AdminMetricsCards } from "../features/admin/components/AdminMetricsCards";
 import { AdminActionLogsCard } from "../features/admin/components/AdminActionLogsCard";
 import { PremiumHistoryCard } from "../features/admin/components/PremiumHistoryCard";
-import { useSnackbar } from "notistack";
 import { formatCurrency } from "../features/earnings/earnings.utils";
-import { Link as RouterLink } from "react-router-dom";
 
 const emptyMetrics: AdminMetrics = {
   totalUsers: 0,
@@ -58,6 +58,9 @@ const premiumDurationOptions = [
   { label: "1 ano", value: 365 },
 ];
 
+const LOGS_PAGE_SIZE = 10;
+const PREMIUM_HISTORY_PAGE_SIZE = 10;
+
 export function AdminDashboardPage() {
   const { profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
@@ -67,6 +70,7 @@ export function AdminDashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
   const [metrics, setMetrics] = useState<AdminMetrics>(emptyMetrics);
   const [logs, setLogs] = useState<AdminActionLogItem[]>([]);
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
@@ -74,24 +78,29 @@ export function AdminDashboardPage() {
   const [policy, setPolicy] = useState<NewUserPremiumPolicy>(emptyPolicy);
   const [massPremiumDays, setMassPremiumDays] = useState(365);
 
-  const loadData = async () => {
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsTotalPages, setLogsTotalPages] = useState(1);
+  const [logsTotalItems, setLogsTotalItems] = useState(0);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const [premiumHistoryPage, setPremiumHistoryPage] = useState(1);
+  const [premiumHistoryTotalPages, setPremiumHistoryTotalPages] = useState(1);
+  const [premiumHistoryTotalItems, setPremiumHistoryTotalItems] = useState(0);
+  const [premiumHistoryLoading, setPremiumHistoryLoading] = useState(false);
+
+  const loadBaseData = async () => {
     try {
       setLoading(true);
 
-      const [nextMetrics, nextLogs, nextPolicy, nextUsers, nextPremiumHistory] =
-        await Promise.all([
-          adminProService.getMetrics(),
-          adminProService.getActionLogs(),
-          adminProService.getNewUserPremiumPolicy(),
-          adminProService.listUsers(""),
-          adminProService.getPremiumHistory(),
-        ]);
+      const [nextMetrics, nextPolicy, nextUsers] = await Promise.all([
+        adminProService.getMetrics(),
+        adminProService.getNewUserPremiumPolicy(),
+        adminProService.listUsers(""),
+      ]);
 
       setMetrics(nextMetrics ?? emptyMetrics);
-      setLogs(nextLogs);
       setPolicy(nextPolicy ?? emptyPolicy);
       setUsers(nextUsers);
-      setPremiumHistory(nextPremiumHistory);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao carregar dashboard admin", {
@@ -100,6 +109,57 @@ export function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadLogsPage = async (page: number) => {
+    try {
+      setLogsLoading(true);
+
+      const result = await adminProService.getActionLogs(page, LOGS_PAGE_SIZE);
+
+      setLogs(result.items);
+      setLogsPage(result.page);
+      setLogsTotalPages(result.totalPages);
+      setLogsTotalItems(result.total);
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao carregar logs administrativos", {
+        variant: "error",
+      });
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const loadPremiumHistoryPage = async (page: number) => {
+    try {
+      setPremiumHistoryLoading(true);
+
+      const result = await adminProService.getPremiumHistory(
+        page,
+        PREMIUM_HISTORY_PAGE_SIZE
+      );
+
+      setPremiumHistory(result.items);
+      setPremiumHistoryPage(result.page);
+      setPremiumHistoryTotalPages(result.totalPages);
+      setPremiumHistoryTotalItems(result.total);
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao carregar histórico premium", {
+        variant: "error",
+      });
+    } finally {
+      setPremiumHistoryLoading(false);
+    }
+  };
+
+  const loadData = async () => {
+    await Promise.all([
+      loadBaseData(),
+      loadLogsPage(1),
+      loadPremiumHistoryPage(1),
+    ]);
   };
 
   useEffect(() => {
@@ -115,9 +175,11 @@ export function AdminDashboardPage() {
     try {
       setActionLoading(true);
       await adminProService.setNewUserPremiumPolicy(enabled, policy.durationDays);
+
       enqueueSnackbar("Política de novos usuários atualizada", {
         variant: "success",
       });
+
       await loadData();
     } catch (error) {
       console.error(error);
@@ -133,9 +195,11 @@ export function AdminDashboardPage() {
     try {
       setActionLoading(true);
       await adminProService.setNewUserPremiumPolicy(policy.enabled, durationDays);
+
       enqueueSnackbar("Duração padrão atualizada", {
         variant: "success",
       });
+
       await loadData();
     } catch (error) {
       console.error(error);
@@ -151,9 +215,11 @@ export function AdminDashboardPage() {
     try {
       setActionLoading(true);
       await adminProService.applyPremiumToAll(massPremiumDays);
+
       enqueueSnackbar("Premium aplicado para todos os usuários atuais", {
         variant: "success",
       });
+
       await loadData();
     } catch (error) {
       console.error(error);
@@ -169,9 +235,11 @@ export function AdminDashboardPage() {
     try {
       setActionLoading(true);
       await adminProService.revokePremiumFromAll();
+
       enqueueSnackbar("Premium revogado de todos os usuários atuais", {
         variant: "success",
       });
+
       await loadData();
     } catch (error) {
       console.error(error);
@@ -187,9 +255,11 @@ export function AdminDashboardPage() {
     try {
       setActionLoading(true);
       await adminProService.resetSystemData();
+
       enqueueSnackbar("Dados do sistema resetados", {
         variant: "success",
       });
+
       await loadData();
     } catch (error) {
       console.error(error);
@@ -205,9 +275,11 @@ export function AdminDashboardPage() {
     try {
       setActionLoading(true);
       await adminProService.clearAllNonAdminUsers();
+
       enqueueSnackbar("Todos os usuários não-admin foram removidos", {
         variant: "success",
       });
+
       await loadData();
     } catch (error) {
       console.error(error);
@@ -220,14 +292,7 @@ export function AdminDashboardPage() {
   };
 
   if (!isAdmin) {
-    return (
-      <PageContainer>
-        <PremiumLockedState
-          title="Acesso restrito"
-          description="Essa área é exclusiva para administradores."
-        />
-      </PageContainer>
-    );
+    return <PremiumLockedState />;
   }
 
   return (
@@ -250,7 +315,8 @@ export function AdminDashboardPage() {
             <Button
               variant="outlined"
               startIcon={<RefreshRoundedIcon />}
-              onClick={() => loadData()}
+              onClick={() => void loadData()}
+              disabled={loading || actionLoading || logsLoading || premiumHistoryLoading}
             >
               Atualizar
             </Button>
@@ -259,74 +325,64 @@ export function AdminDashboardPage() {
               variant="outlined"
               startIcon={<DownloadRoundedIcon />}
               onClick={() => adminProService.exportUsersCsv(users)}
+              disabled={!users.length}
             >
               Exportar CSV
             </Button>
 
             <Button
+              component={RouterLink}
+              to="/admin/users"
               variant="contained"
               startIcon={<PeopleRoundedIcon />}
               onClick={() => navigate("/admin/users")}
             >
               Gerenciar usuários
             </Button>
-                                <Button
-component={RouterLink}
-to="/admin/system"
-variant="contained"
->
-Configurações do sistema
-</Button>
           </Stack>
         </Stack>
 
-        <Alert severity="warning">
-          Área administrativa com acesso sensível.
-        </Alert>
+        <AppCard>
+          <Stack spacing={1}>
+            <Typography variant="h6">Configurações do sistema</Typography>
+            <Alert severity="warning">
+              Área administrativa com acesso sensível.
+            </Alert>
+          </Stack>
+        </AppCard>
 
         {loading ? (
           <AppSkeleton />
         ) : (
           <>
+            <Stack spacing={1}>
+              <Typography variant="h6">Métricas financeiras do SaaS</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Preço premium mensal: {formatCurrency(metrics.monthlyPremiumPrice)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                MRR potencial: {formatCurrency(metrics.potentialMrr)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                ARR potencial: {formatCurrency(metrics.potentialArr)}
+              </Typography>
+            </Stack>
+
             <AdminMetricsCards metrics={metrics} />
 
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppCard>
-                  <Typography variant="h6" gutterBottom>
-                    Métricas financeiras do SaaS
-                  </Typography>
-
-                  <Stack spacing={1}>
-                    <Typography variant="body2" color="text.secondary">
-                      Preço premium mensal: {formatCurrency(metrics.monthlyPremiumPrice)}
-                    </Typography>
-
-                    <Typography variant="body2" color="text.secondary">
-                      MRR potencial: {formatCurrency(metrics.potentialMrr)}
-                    </Typography>
-
-                    <Typography variant="body2" color="text.secondary">
-                      ARR potencial: {formatCurrency(metrics.potentialArr)}
-                    </Typography>
-                  </Stack>
-                </AppCard>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 6 }}>
+              <Grid size={{ xs: 12, lg: 6 }}>
                 <AppCard>
                   <Stack spacing={2}>
-                    <Typography variant="h6">
-                      Política e ações globais
-                    </Typography>
+                    <Typography variant="h6">Política e ações globais</Typography>
 
                     <TextField
                       select
                       fullWidth
-                      label="Novos usuários premium por"
+                      label="Duração padrão para novos usuários"
                       value={policy.durationDays}
                       onChange={(e) =>
-                        handleSetNewUserDuration(Number(e.target.value))
+                        void handleSetNewUserDuration(Number(e.target.value))
                       }
                       disabled={actionLoading}
                     >
@@ -339,20 +395,19 @@ Configurações do sistema
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                       <Button
-                        fullWidth
                         variant="contained"
+                        color="success"
+                        onClick={() => void handleSetNewUserPremiumPolicy(true)}
                         disabled={actionLoading}
-                        onClick={() => handleSetNewUserPremiumPolicy(true)}
                       >
                         Ativar premium p/ novos
                       </Button>
 
                       <Button
-                        fullWidth
                         variant="outlined"
                         color="warning"
+                        onClick={() => void handleSetNewUserPremiumPolicy(false)}
                         disabled={actionLoading}
-                        onClick={() => handleSetNewUserPremiumPolicy(false)}
                       >
                         Revogar premium p/ novos
                       </Button>
@@ -361,7 +416,7 @@ Configurações do sistema
                     <TextField
                       select
                       fullWidth
-                      label="Aplicar premium para atuais"
+                      label="Duração do premium em massa"
                       value={massPremiumDays}
                       onChange={(e) => setMassPremiumDays(Number(e.target.value))}
                       disabled={actionLoading}
@@ -375,45 +430,42 @@ Configurações do sistema
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                       <Button
-                        fullWidth
                         variant="contained"
-                        color="success"
+                        onClick={() => void handleApplyPremiumToAll()}
                         disabled={actionLoading}
-                        onClick={handleApplyPremiumToAll}
                       >
                         Dar premium para atuais
                       </Button>
 
                       <Button
-                        fullWidth
                         variant="outlined"
                         color="warning"
+                        onClick={() => void handleRevokePremiumFromAll()}
                         disabled={actionLoading}
-                        onClick={handleRevokePremiumFromAll}
                       >
                         Tirar premium de atuais
                       </Button>
                     </Stack>
 
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="error"
-                      disabled={actionLoading}
-                      onClick={handleResetSystemData}
-                    >
-                      Resetar ganhos, gastos, contatos e logs
-                    </Button>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => void handleResetSystemData()}
+                        disabled={actionLoading}
+                      >
+                        Resetar ganhos, gastos, contatos e logs
+                      </Button>
 
-                    <Button
-                      fullWidth
-                      variant="contained"
-                      color="error"
-                      disabled={actionLoading}
-                      onClick={handleClearAllNonAdminUsers}
-                    >
-                      Remover todos usuários não-admin
-                    </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => void handleClearAllNonAdminUsers()}
+                        disabled={actionLoading}
+                      >
+                        Remover todos usuários não-admin
+                      </Button>
+                    </Stack>
 
                     <Typography variant="body2" color="text.secondary">
                       Política atual: novos usuários entram{" "}
@@ -424,12 +476,26 @@ Configurações do sistema
                 </AppCard>
               </Grid>
 
-              <Grid size={{ xs: 12, lg: 4 }}>
-                <AdminActionLogsCard items={logs} />
+              <Grid size={{ xs: 12, lg: 6 }}>
+                <AdminActionLogsCard
+                  items={logs}
+                  page={logsPage}
+                  totalPages={logsTotalPages}
+                  totalItems={logsTotalItems}
+                  loading={logsLoading}
+                  onPageChange={(page) => void loadLogsPage(page)}
+                />
               </Grid>
 
-              <Grid size={{ xs: 12, lg: 8 }}>
-                <PremiumHistoryCard items={premiumHistory} />
+              <Grid size={{ xs: 12 }}>
+                <PremiumHistoryCard
+                  items={premiumHistory}
+                  page={premiumHistoryPage}
+                  totalPages={premiumHistoryTotalPages}
+                  totalItems={premiumHistoryTotalItems}
+                  loading={premiumHistoryLoading}
+                  onPageChange={(page) => void loadPremiumHistoryPage(page)}
+                />
               </Grid>
             </Grid>
           </>

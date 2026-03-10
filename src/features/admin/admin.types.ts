@@ -118,3 +118,11 @@ export type UserSubscription = {
   created_at: string;
   updated_at: string;
 };
+
+export type PaginatedResult<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};

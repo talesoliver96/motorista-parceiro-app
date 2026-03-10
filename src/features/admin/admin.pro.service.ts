@@ -5,6 +5,7 @@ import type {
   AdminUserListItem,
   AdminUserUpdatePayload,
   NewUserPremiumPolicy,
+  PaginatedResult,
   PremiumHistoryItem,
 } from "./admin.types";
 
@@ -17,7 +18,6 @@ export const adminSettingsService = {
       .single();
 
     if (error) throw error;
-
     return data?.value;
   },
 
@@ -77,6 +77,26 @@ function toCsvValue(value: unknown) {
   return `"${stringValue.replace(/"/g, '""')}"`;
 }
 
+function buildPaginatedResult<T>(
+  items: T[],
+  total: number | null,
+  page: number,
+  pageSize: number
+): PaginatedResult<T> {
+  const safeTotal = Math.max(0, total ?? 0);
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.max(1, pageSize);
+  const totalPages = Math.max(1, Math.ceil(safeTotal / safePageSize));
+
+  return {
+    items,
+    total: safeTotal,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages,
+  };
+}
+
 export const adminProService = {
   async listUsers(search = "") {
     const data = await callFunction("admin-users-pro", {
@@ -106,28 +126,54 @@ export const adminProService = {
     return (data?.metrics ?? null) as AdminMetrics | null;
   },
 
-  async getActionLogs(): Promise<AdminActionLogItem[]> {
-    const { data, error } = await supabase
+  async getActionLogs(
+    page = 1,
+    pageSize = 10
+  ): Promise<PaginatedResult<AdminActionLogItem>> {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, pageSize);
+    const from = (safePage - 1) * safePageSize;
+    const to = from + safePageSize - 1;
+
+    const { data, count, error } = await supabase
       .from("admin_actions_enriched")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(20);
+      .range(from, to);
 
     if (error) throw error;
 
-    return (data ?? []) as AdminActionLogItem[];
+    return buildPaginatedResult(
+      (data ?? []) as AdminActionLogItem[],
+      count,
+      safePage,
+      safePageSize
+    );
   },
 
-    async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
-    const { data, error } = await supabase
+  async getPremiumHistory(
+    page = 1,
+    pageSize = 10
+  ): Promise<PaginatedResult<PremiumHistoryItem>> {
+    const safePage = Math.max(1, page);
+    const safePageSize = Math.max(1, pageSize);
+    const from = (safePage - 1) * safePageSize;
+    const to = from + safePageSize - 1;
+
+    const { data, count, error } = await supabase
       .from("premium_history_enriched")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(50);
+      .range(from, to);
 
     if (error) throw error;
 
-    return (data ?? []) as PremiumHistoryItem[];
+    return buildPaginatedResult(
+      (data ?? []) as PremiumHistoryItem[],
+      count,
+      safePage,
+      safePageSize
+    );
   },
 
   async getNewUserPremiumPolicy(): Promise<NewUserPremiumPolicy> {
@@ -174,8 +220,6 @@ export const adminProService = {
     });
   },
 
-  
-
   exportUsersCsv(users: AdminUserListItem[]) {
     const header = [
       "Nome",
@@ -205,14 +249,13 @@ export const adminProService = {
       .map((row) => row.map(toCsvValue).join(","))
       .join("\n");
 
-    const blob = new Blob([csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.setAttribute("download", "usuarios-motorista-parceiro.csv");
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
