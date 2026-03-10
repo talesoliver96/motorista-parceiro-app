@@ -244,6 +244,9 @@ export const adminProService = {
       "Premium até",
       "Admin",
       "Bloqueado",
+      "Modo",
+      "Usa saldo",
+      "Saldo",
       "Criado em",
       "Último login",
     ];
@@ -256,6 +259,9 @@ export const adminProService = {
       user.premium_until ?? "",
       user.is_admin ? "Sim" : "Não",
       user.is_blocked ? "Sim" : "Não",
+      user.app_mode === "basic" ? "Controle financeiro essencial" : "Gestão para motoristas",
+      user.wallet_enabled ? "Sim" : "Não",
+      user.wallet_balance ?? 0,
       user.created_at ?? "",
       user.last_sign_in_at ?? "",
     ]);

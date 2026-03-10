@@ -8,8 +8,10 @@ import {
   Typography,
 } from "@mui/material";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { useEffect, useState } from "react";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
@@ -332,6 +334,15 @@ export function AdminDashboardPage() {
 
             <Button
               component={RouterLink}
+              to="/admin/system"
+              variant="outlined"
+              startIcon={<SettingsRoundedIcon />}
+            >
+              Gerenciar assinatura
+            </Button>
+
+            <Button
+              component={RouterLink}
               to="/admin/users"
               variant="contained"
               startIcon={<PeopleRoundedIcon />}
@@ -374,7 +385,23 @@ export function AdminDashboardPage() {
               <Grid size={{ xs: 12, lg: 6 }}>
                 <AppCard>
                   <Stack spacing={2}>
-                    <Typography variant="h6">Política e ações globais</Typography>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      justifyContent="space-between"
+                      spacing={1}
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                    >
+                      <Typography variant="h6">Política e ações globais</Typography>
+
+                      <Button
+                        component={RouterLink}
+                        to="/admin/system-settings"
+                        size="small"
+                        startIcon={<ManageAccountsRoundedIcon />}
+                      >
+                        Abrir configuração completa
+                      </Button>
+                    </Stack>
 
                     <TextField
                       select

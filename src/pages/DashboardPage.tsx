@@ -55,6 +55,10 @@ export function DashboardPage() {
   const { settings } = usePublicAppSettings();
 
   const profilePremium = isPremiumProfile(profile);
+  const walletEnabled = profile?.wallet_enabled ?? false;
+  const walletBalance = Number(profile?.wallet_balance ?? 0);
+  const appMode = profile?.app_mode ?? "driver";
+  const isDriverMode = appMode === "driver";
 
   const now = useMemo(() => dayjs(), []);
   const [startDate, setStartDate] = useState(
@@ -149,7 +153,10 @@ export function DashboardPage() {
 
   const premiumActive = summary.premiumActive || profilePremium;
   const earningPerKm =
-    premiumActive && summary.totalKm > 0 ? summary.gross / summary.totalKm : null;
+    premiumActive && isDriverMode && summary.totalKm > 0
+      ? summary.gross / summary.totalKm
+      : null;
+  const totalAvailable = walletEnabled ? walletBalance + summary.net : summary.net;
 
   return (
     <PageContainer>
@@ -163,7 +170,9 @@ export function DashboardPage() {
           <Stack spacing={0.5}>
             <Typography variant="h4">Olá, {firstName} 👋</Typography>
             <Typography color="text.secondary">
-              Veja seu desempenho financeiro no período selecionado.
+              {isDriverMode
+                ? "Veja seu desempenho financeiro no período selecionado."
+                : "Acompanhe seu resultado financeiro de forma simples e objetiva."}
             </Typography>
           </Stack>
 
@@ -180,7 +189,7 @@ export function DashboardPage() {
             ) : null}
 
             <Button variant="contained" onClick={() => navigate("/earnings")}>
-              Adicionar ganho
+              {isDriverMode ? "Adicionar ganho" : "Adicionar entrada"}
             </Button>
 
             <Button variant="outlined" onClick={() => navigate("/expenses")}>
@@ -189,13 +198,22 @@ export function DashboardPage() {
           </Stack>
         </Stack>
 
-        {premiumActive ? (
-          <Alert severity="success">
-            Sua conta premium libera projeção, ganho por KM e combustível automático.
-          </Alert>
+        {isDriverMode ? (
+          premiumActive ? (
+            <Alert severity="success">
+              Sua conta premium libera projeção, ganho por KM, combustível automático
+              por ganho e compensação inteligente com abastecimentos manuais.
+            </Alert>
+          ) : (
+            <Alert severity="info">
+              Projeção, ganho por KM, combustível automático e compensação inteligente
+              são recursos premium.
+            </Alert>
+          )
         ) : (
           <Alert severity="info">
-            Projeção, ganho por KM, combustível automático e relatórios são recursos premium.
+            Você está usando a experiência de controle financeiro essencial, com foco
+            em entradas, gastos, saldo e total disponível.
           </Alert>
         )}
 
@@ -214,47 +232,71 @@ export function DashboardPage() {
               gross={summary.gross}
               totalExpenses={summary.totalExpenses}
               net={summary.net}
-              km={summary.totalKm}
-              earningPerKm={earningPerKm}
-              isPremium={premiumActive}
+              km={isDriverMode ? summary.totalKm : 0}
+              earningPerKm={isDriverMode ? earningPerKm : null}
+              isPremium={premiumActive && isDriverMode}
+              appMode={appMode}
             />
 
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, lg: 8 }}>
-                <EarningsByDayChart data={details.chartData} />
+                <EarningsByDayChart data={details.chartData} appMode={appMode} />
               </Grid>
 
               <Grid size={{ xs: 12, lg: 4 }}>
-                <RecentActivityCard items={details.recentActivity} />
+                <RecentActivityCard
+                  items={details.recentActivity}
+                  appMode={appMode}
+                />
               </Grid>
 
               <Grid size={{ xs: 12, md: 4 }}>
                 <AppCard>
                   <Typography variant="body2" color="text.secondary">
-                    Gastos manuais
+                    Gastos manuais considerados
                   </Typography>
 
                   <Typography variant="h5" sx={{ mt: 1 }}>
                     {formatCurrency(summary.manualExpenses)}
                   </Typography>
-                </AppCard>
-              </Grid>
 
-              <Grid size={{ xs: 12, md: 4 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Combustível automático
-                  </Typography>
-
-                  <Typography variant="h5" sx={{ mt: 1 }}>
-                    {premiumActive
-                      ? formatCurrency(summary.automaticFuel)
-                      : "Premium"}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    {isDriverMode
+                      ? "Já considera a compensação de abastecimentos manuais quando aplicável."
+                      : "Representa os gastos registrados no período selecionado."}
                   </Typography>
                 </AppCard>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 4 }}>
+              {isDriverMode ? (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <AppCard>
+                    <Typography variant="body2" color="text.secondary">
+                      Combustível automático restante
+                    </Typography>
+
+                    <Typography variant="h5" sx={{ mt: 1 }}>
+                      {premiumActive
+                        ? formatCurrency(summary.automaticFuel)
+                        : "Premium"}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      Representa apenas o valor automático ainda não compensado por abastecimentos manuais.
+                    </Typography>
+                  </AppCard>
+                </Grid>
+              ) : null}
+
+              <Grid size={{ xs: 12, md: isDriverMode ? 4 : 8 }}>
                 <AppCard>
                   <Typography variant="body2" color="text.secondary">
                     Resultado do período
@@ -273,10 +315,60 @@ export function DashboardPage() {
                     color="text.secondary"
                     sx={{ mt: 1 }}
                   >
-                    Lucro líquido = ganho bruto - gastos.
+                    {isDriverMode
+                      ? "Lucro líquido = ganho bruto - gastos considerados do período."
+                      : "Resultado líquido = entradas - gastos considerados do período."}
                   </Typography>
                 </AppCard>
               </Grid>
+
+              {walletEnabled ? (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <AppCard>
+                    <Typography variant="body2" color="text.secondary">
+                      Saldo da carteira
+                    </Typography>
+
+                    <Typography variant="h5" sx={{ mt: 1 }}>
+                      {formatCurrency(walletBalance)}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      Valor disponível informado manualmente nas configurações.
+                    </Typography>
+                  </AppCard>
+                </Grid>
+              ) : null}
+
+              {walletEnabled ? (
+                <Grid size={{ xs: 12, md: 6 }}>
+                  <AppCard>
+                    <Typography variant="body2" color="text.secondary">
+                      Total disponível
+                    </Typography>
+
+                    <Typography
+                      variant="h5"
+                      sx={{ mt: 1 }}
+                      color={totalAvailable >= 0 ? "success.main" : "error.main"}
+                    >
+                      {formatCurrency(totalAvailable)}
+                    </Typography>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      Total disponível = saldo da carteira + resultado líquido do período.
+                    </Typography>
+                  </AppCard>
+                </Grid>
+              ) : null}
 
               <Grid size={{ xs: 12, md: 6 }}>
                 <AppCard>
@@ -285,9 +377,11 @@ export function DashboardPage() {
                   </Typography>
 
                   <Typography variant="h5" sx={{ mt: 1 }}>
-                    {premiumActive && details.projection !== null
+                    {premiumActive && isDriverMode && details.projection !== null
                       ? formatCurrency(details.projection)
-                      : "Premium"}
+                      : isDriverMode
+                      ? "Premium"
+                      : "-"}
                   </Typography>
 
                   <Typography
@@ -295,7 +389,9 @@ export function DashboardPage() {
                     color="text.secondary"
                     sx={{ mt: 1 }}
                   >
-                    Disponível para usuários premium no mês atual completo.
+                    {isDriverMode
+                      ? "Disponível para usuários premium no mês atual completo."
+                      : "A experiência essencial prioriza leitura simples do período atual."}
                   </Typography>
                 </AppCard>
               </Grid>
@@ -316,7 +412,9 @@ export function DashboardPage() {
                     color="text.secondary"
                     sx={{ mt: 1 }}
                   >
-                    Os indicadores acima usam resumo seguro do período selecionado.
+                    {isDriverMode
+                      ? "Os indicadores acima usam resumo seguro e reconciliação de combustível do período selecionado."
+                      : "Os indicadores acima usam o resumo financeiro do período selecionado."}
                   </Typography>
                 </AppCard>
               </Grid>

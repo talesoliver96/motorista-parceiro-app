@@ -20,6 +20,8 @@ import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import MailOutlineRoundedIcon from "@mui/icons-material/MailOutlineRounded";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
+import WalletRoundedIcon from "@mui/icons-material/WalletRounded";
+import DirectionsCarFilledRoundedIcon from "@mui/icons-material/DirectionsCarFilledRounded";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { useAuth } from "../../app/providers/AuthProvider";
@@ -35,26 +37,6 @@ type NavItem = {
   adminOnly?: boolean;
 };
 
-const navItems: NavItem[] = [
-  { label: "Dashboard", path: "/dashboard", icon: <DashboardRoundedIcon /> },
-  { label: "Ganhos", path: "/earnings", icon: <PaidRoundedIcon /> },
-  { label: "Gastos", path: "/expenses", icon: <ReceiptLongRoundedIcon /> },
-  { label: "Contato", path: "/contact", icon: <MailOutlineRoundedIcon /> },
-  { label: "Configurações", path: "/settings", icon: <SettingsRoundedIcon /> },
-  {
-    label: "Relatórios",
-    path: "/reports",
-    icon: <InsightsRoundedIcon />,
-    premium: true,
-  },
-  {
-    label: "Admin",
-    path: "/admin",
-    icon: <AdminPanelSettingsRoundedIcon />,
-    adminOnly: true,
-  },
-];
-
 type Props = {
   mobileOpen: boolean;
   onCloseMobile: () => void;
@@ -66,6 +48,54 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
   const { profile } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
+  const appMode = profile?.app_mode ?? "driver";
+  const isBasicMode = appMode === "basic";
+
+  const navItems = useMemo<NavItem[]>(() => {
+    const common: NavItem[] = [
+      {
+        label: isBasicMode ? "Visão geral" : "Dashboard",
+        path: "/dashboard",
+        icon: <DashboardRoundedIcon />,
+      },
+      {
+        label: isBasicMode ? "Entradas" : "Ganhos",
+        path: "/earnings",
+        icon: isBasicMode ? <WalletRoundedIcon /> : <PaidRoundedIcon />,
+      },
+      {
+        label: isBasicMode ? "Saídas" : "Gastos",
+        path: "/expenses",
+        icon: <ReceiptLongRoundedIcon />,
+      },
+      {
+        label: isBasicMode ? "Análises" : "Relatórios",
+        path: "/reports",
+        icon: <InsightsRoundedIcon />,
+        premium: true,
+      },
+      {
+        label: "Suporte",
+        path: "/contact",
+        icon: <MailOutlineRoundedIcon />,
+      },
+      {
+        label: "Configurações",
+        path: "/settings",
+        icon: <SettingsRoundedIcon />,
+      },
+    ];
+
+    common.push({
+      label: "Admin",
+      path: "/admin",
+      icon: <AdminPanelSettingsRoundedIcon />,
+      adminOnly: true,
+    });
+
+    return common;
+  }, [isBasicMode]);
+
   const width = collapsed ? drawerCollapsed : drawerWidth;
 
   const visibleItems = useMemo(() => {
@@ -76,31 +106,80 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
 
       return true;
     });
-  }, [profile]);
+  }, [navItems, profile]);
+
+  const modeLabel = isBasicMode
+    ? "Controle essencial"
+    : "Gestão para motoristas";
+
+  const modeIcon = isBasicMode ? (
+    <WalletRoundedIcon fontSize="small" />
+  ) : (
+    <DirectionsCarFilledRoundedIcon fontSize="small" />
+  );
 
   const content = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <Box
+      sx={{
+        width,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        p: 1.5,
+        boxSizing: "border-box",
+      }}
+    >
       <Box
         sx={{
-          height: 64,
           display: "flex",
-          alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          px: 2,
+          alignItems: collapsed ? "center" : "flex-start",
+          justifyContent: "space-between",
+          gap: 1,
+          px: collapsed ? 0 : 1,
+          pb: 1,
         }}
       >
-        {!collapsed && (
-          <Typography fontWeight={700}>MotoristaParceiro</Typography>
+        {!collapsed ? (
+          <Box>
+            <Typography variant="h6" fontWeight={700}>
+              MotoristaParceiro
+            </Typography>
+
+            <Typography variant="caption" color="text.secondary">
+              {isBasicMode
+                ? "Controle financeiro inteligente"
+                : "Gestão operacional e financeira"}
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+            {modeIcon}
+          </Box>
         )}
 
-        <IconButton onClick={() => setCollapsed((prev) => !prev)}>
+        <IconButton
+          onClick={() => setCollapsed((prev) => !prev)}
+          sx={{ alignSelf: collapsed ? "center" : "flex-start" }}
+        >
           {collapsed ? <MenuRoundedIcon /> : <MenuOpenRoundedIcon />}
         </IconButton>
       </Box>
 
-      <Divider />
+      {!collapsed ? (
+        <Box sx={{ px: 1, pb: 1.5 }}>
+          <Chip
+            icon={modeIcon}
+            label={modeLabel}
+            size="small"
+            color={isBasicMode ? "default" : "primary"}
+            variant={isBasicMode ? "outlined" : "filled"}
+          />
+        </Box>
+      ) : null}
 
-      <List sx={{ px: 1, py: 1 }}>
+      <Divider sx={{ mb: 1.5 }} />
+
+      <List sx={{ p: 0 }}>
         {visibleItems.map((item) => {
           const selected =
             location.pathname === item.path ||
@@ -117,6 +196,7 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
                 borderRadius: 2,
                 mb: 0.5,
                 justifyContent: collapsed ? "center" : "flex-start",
+                minHeight: 46,
               }}
             >
               <ListItemIcon
@@ -128,36 +208,17 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
                 {item.icon}
               </ListItemIcon>
 
-              {!collapsed && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    width: "100%",
-                    gap: 1,
-                  }}
-                >
-                  <ListItemText primary={item.label} />
-                  {item.premium ? (
-                    <Chip
-                      size="small"
-                      label="Premium"
-                      color="success"
-                      variant="outlined"
-                    />
-                  ) : null}
-                </Box>
-              )}
+              {!collapsed ? (
+                <ListItemText
+                  primary={item.label}
+                  secondary={item.premium ? "Premium" : undefined}
+                />
+              ) : null}
             </ListItemButton>
           );
 
           return collapsed ? (
-            <Tooltip
-              key={item.path}
-              title={item.premium ? `${item.label} • Premium` : item.label}
-              placement="right"
-            >
+            <Tooltip key={item.path} title={item.label} placement="right">
               <Box>{button}</Box>
             </Tooltip>
           ) : (
@@ -171,9 +232,9 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
   return (
     <>
       <Drawer
-        variant="temporary"
         open={mobileOpen}
         onClose={onCloseMobile}
+        variant="temporary"
         ModalProps={{ keepMounted: true }}
         sx={{
           display: { xs: "block", md: "none" },
@@ -187,16 +248,21 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
       </Drawer>
 
       <Drawer
-        variant="permanent"
         open
+        variant="permanent"
         sx={{
           display: { xs: "none", md: "block" },
+          width,
+          flexShrink: 0,
           "& .MuiDrawer-paper": {
             width,
-            overflowX: "hidden",
-            transition: "width .2s ease",
             boxSizing: "border-box",
-            borderRight: "1px solid rgba(128,128,128,0.12)",
+            overflowX: "hidden",
+            transition: (theme) =>
+              theme.transitions.create("width", {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.shorter,
+              }),
           },
         }}
       >

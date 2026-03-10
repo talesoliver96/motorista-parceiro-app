@@ -15,6 +15,7 @@ const corsHeaders = {
 };
 
 type UserListFilter = "all" | "premium" | "free" | "admins" | "blocked";
+type AppMode = "driver" | "basic";
 
 type ListActionBody = {
   action: "list";
@@ -36,6 +37,9 @@ type UpdateActionBody = {
   premiumUntil?: string;
   isAdmin: boolean;
   isBlocked: boolean;
+  appMode: AppMode;
+  walletEnabled: boolean;
+  walletBalance: number;
 };
 
 type DeleteActionBody = {
@@ -91,6 +95,9 @@ type MergedUser = {
   premium_until: string | null;
   is_admin: boolean;
   is_blocked: boolean;
+  app_mode: AppMode;
+  wallet_enabled: boolean;
+  wallet_balance: number;
   created_at: string | null;
   last_sign_in_at: string | null;
 };
@@ -226,6 +233,9 @@ serve(async (req) => {
             premium_until: profile?.premium_until ?? null,
             is_admin: Boolean(profile?.is_admin),
             is_blocked: Boolean(profile?.is_blocked),
+            app_mode: profile?.app_mode === "basic" ? "basic" : "driver",
+            wallet_enabled: Boolean(profile?.wallet_enabled),
+            wallet_balance: Number(profile?.wallet_balance ?? 0),
             created_at: user.created_at ?? null,
             last_sign_in_at: user.last_sign_in_at ?? null,
           };
@@ -555,6 +565,9 @@ serve(async (req) => {
         premiumUntil,
         isAdmin,
         isBlocked,
+        appMode,
+        walletEnabled,
+        walletBalance,
       } = body;
 
       const updateAuthPayload: Record<string, unknown> = {
@@ -619,6 +632,9 @@ serve(async (req) => {
             premium_until,
             is_admin: isAdmin,
             is_blocked: isBlocked,
+            app_mode: appMode,
+            wallet_enabled: walletEnabled,
+            wallet_balance: Number(walletBalance ?? 0),
           }),
         }
       );
@@ -643,6 +659,9 @@ serve(async (req) => {
           premiumUntil: premiumUntil ?? null,
           isAdmin,
           isBlocked,
+          appMode,
+          walletEnabled,
+          walletBalance: Number(walletBalance ?? 0),
           passwordChanged: Boolean(password?.trim()),
         },
       });

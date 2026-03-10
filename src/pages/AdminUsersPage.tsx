@@ -65,6 +65,16 @@ const adminUserSchema = z
     premiumUntil: z.string().optional(),
     isAdmin: z.boolean(),
     isBlocked: z.boolean(),
+    appMode: z.enum(["driver", "basic"]),
+    walletEnabled: z.boolean(),
+    walletBalance: z.preprocess((value) => {
+      if (value === "" || value === null || value === undefined) {
+        return 0;
+      }
+
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }, z.number()),
   })
   .superRefine((values, ctx) => {
     if (values.password?.trim() && values.password.trim().length < 6) {
@@ -114,6 +124,12 @@ const emptyMetrics: AdminMetrics = {
 
 const PAGE_SIZE = 10;
 
+function getAppModeLabel(appMode: "driver" | "basic") {
+  return appMode === "basic"
+    ? "Controle financeiro essencial"
+    : "Gestão para motoristas";
+}
+
 export function AdminUsersPage() {
   const { profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
@@ -160,10 +176,14 @@ export function AdminUsersPage() {
       premiumUntil: "",
       isAdmin: false,
       isBlocked: false,
+      appMode: "driver",
+      walletEnabled: false,
+      walletBalance: 0,
     },
   });
 
   const premiumMode = watch("premiumMode");
+  const walletEnabled = watch("walletEnabled");
 
   const loadUsers = async (
     nextPage = page,
@@ -231,6 +251,9 @@ export function AdminUsersPage() {
       premiumUntil: user.premium_until ? user.premium_until.slice(0, 10) : "",
       isAdmin: user.is_admin,
       isBlocked: user.is_blocked,
+      appMode: user.app_mode || "driver",
+      walletEnabled: user.wallet_enabled || false,
+      walletBalance: Number(user.wallet_balance ?? 0),
     });
 
     setDialogOpen(true);
@@ -259,6 +282,9 @@ export function AdminUsersPage() {
         premiumUntil: values.premiumUntil,
         isAdmin: values.isAdmin,
         isBlocked: values.isBlocked,
+        appMode: values.appMode,
+        walletEnabled: values.walletEnabled,
+        walletBalance: Number(values.walletBalance ?? 0),
       };
 
       await adminProService.updateUser(payload);
@@ -326,7 +352,7 @@ export function AdminUsersPage() {
         <Stack spacing={0.5}>
           <Typography variant="h4">Administração de usuários</Typography>
           <Typography color="text.secondary">
-            Gerencie conta, premium, senha, e-mail, bloqueio e permissões dos usuários.
+            Gerencie conta, premium, experiência de uso, saldo, senha, e-mail, bloqueio e permissões dos usuários.
           </Typography>
         </Stack>
 
@@ -446,7 +472,8 @@ export function AdminUsersPage() {
                         <TableCell>E-mail</TableCell>
                         <TableCell>Telefone</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Conta</TableCell>
+                        <TableCell>Modo</TableCell>
+                        <TableCell>Saldo</TableCell>
                         <TableCell>Admin</TableCell>
                         <TableCell>Criado em</TableCell>
                         <TableCell>Último login</TableCell>
@@ -460,6 +487,7 @@ export function AdminUsersPage() {
                           <TableCell>{user.name || "-"}</TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell>{user.phone || "-"}</TableCell>
+
                           <TableCell>
                             <Stack direction="row" spacing={1} flexWrap="wrap">
                               <Chip
@@ -474,16 +502,19 @@ export function AdminUsersPage() {
                               />
                             </Stack>
                           </TableCell>
+
+                          <TableCell>{getAppModeLabel(user.app_mode)}</TableCell>
+
                           <TableCell>
-                            {user.is_admin ? (
-                              <Chip size="small" label="Administrador" color="primary" />
-                            ) : (
-                              <Chip size="small" label="Usuário" />
-                            )}
+                            {user.wallet_enabled
+                              ? `R$ ${Number(user.wallet_balance ?? 0).toFixed(2)}`
+                              : "Desativado"}
                           </TableCell>
+
                           <TableCell>{user.is_admin ? "Sim" : "Não"}</TableCell>
                           <TableCell>{formatAdminDate(user.created_at)}</TableCell>
                           <TableCell>{formatAdminDate(user.last_sign_in_at)}</TableCell>
+
                           <TableCell align="right">
                             <IconButton onClick={() => openEditDialog(user)}>
                               <EditRoundedIcon />
@@ -501,7 +532,7 @@ export function AdminUsersPage() {
 
                       {!users.length ? (
                         <TableRow>
-                          <TableCell colSpan={9}>
+                          <TableCell colSpan={10}>
                             <Typography color="text.secondary">
                               Nenhum usuário encontrado.
                             </Typography>
@@ -627,6 +658,51 @@ export function AdminUsersPage() {
               helperText={errors.premiumUntil?.message}
             />
           ) : null}
+
+          <TextField
+            select
+            fullWidth
+            label="Experiência do aplicativo"
+            {...register("appMode")}
+            error={!!errors.appMode}
+            helperText={errors.appMode?.message}
+          >
+            <MenuItem value="driver">Gestão para motoristas</MenuItem>
+            <MenuItem value="basic">Controle financeiro essencial</MenuItem>
+          </TextField>
+
+          <Controller
+            name="walletEnabled"
+            control={control}
+            render={({ field }) => (
+              <TextField
+                select
+                fullWidth
+                label="Usar saldo / carteira"
+                value={field.value ? "yes" : "no"}
+                onChange={(e) => field.onChange(e.target.value === "yes")}
+              >
+                <MenuItem value="no">Não</MenuItem>
+                <MenuItem value="yes">Sim</MenuItem>
+              </TextField>
+            )}
+          />
+
+          <TextField
+            label="Saldo atual"
+            type="number"
+            fullWidth
+            disabled={!walletEnabled}
+            inputProps={{ step: "0.01" }}
+            {...register("walletBalance")}
+            error={!!errors.walletBalance}
+            helperText={
+              errors.walletBalance?.message ||
+              (walletEnabled
+                ? "Valor atual da carteira/saldo do usuário."
+                : "Ative o uso do saldo para editar esse valor.")
+            }
+          />
 
           <Controller
             name="isAdmin"

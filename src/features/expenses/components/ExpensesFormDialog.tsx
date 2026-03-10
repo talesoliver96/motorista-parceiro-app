@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Alert,
   Button,
   CircularProgress,
   Grid,
@@ -9,6 +10,7 @@ import {
 } from "@mui/material";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
+
 import { AppDialog } from "../../../components/common/AppDialog";
 import { CurrencyField } from "../../../components/common/CurrencyField";
 import type { Expense } from "../../../types/database";
@@ -16,7 +18,9 @@ import {
   expenseCategories,
   expenseSchema,
   type ExpenseFormData,
+  type ExpenseFormInput,
 } from "../expenses.schemas";
+import { isFuelExpenseCategory } from "../expenses.utils";
 
 type Props = {
   open: boolean;
@@ -39,6 +43,19 @@ function parseCurrencyToNumber(value: string | undefined) {
   );
 }
 
+function toCurrencyFieldValue(value: unknown): string | number | null | undefined {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    value === null ||
+    value === undefined
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
 export function ExpensesFormDialog({
   open,
   loading = false,
@@ -51,18 +68,23 @@ export function ExpensesFormDialog({
   const {
     register,
     control,
+    watch,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<ExpenseFormData>({
-    resolver: zodResolver(expenseSchema) as any,
+  } = useForm<ExpenseFormInput, unknown, ExpenseFormData>({
+    resolver: zodResolver(expenseSchema),
     defaultValues: {
       date: "",
       category: "",
       amount: 0,
+      compensate_automatic_fuel: false,
       notes: "",
     },
   });
+
+  const category = watch("category");
+  const isFuelCategory = isFuelExpenseCategory(category);
 
   useEffect(() => {
     if (!open) return;
@@ -72,6 +94,7 @@ export function ExpensesFormDialog({
         date: initialData.date,
         category: initialData.category,
         amount: initialData.amount,
+        compensate_automatic_fuel: Boolean(initialData.compensate_automatic_fuel),
         notes: initialData.notes ?? "",
       });
       return;
@@ -81,6 +104,7 @@ export function ExpensesFormDialog({
       date: new Date().toISOString().slice(0, 10),
       category: "",
       amount: 0,
+      compensate_automatic_fuel: false,
       notes: "",
     });
   }, [open, initialData, reset]);
@@ -95,22 +119,24 @@ export function ExpensesFormDialog({
           <Button onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
+
           <Button
-            onClick={handleSubmit(onSubmit)}
             variant="contained"
+            onClick={() => void handleSubmit(onSubmit)()}
             disabled={loading}
           >
-            {loading ? <CircularProgress size={22} /> : "Salvar"}
+            {loading ? <CircularProgress size={20} /> : "Salvar"}
           </Button>
         </>
       }
     >
-      <Stack spacing={2} sx={{ mt: 1 }}>
+      <Stack spacing={2} mt={1}>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               label="Data"
               type="date"
+              fullWidth
               InputLabelProps={{ shrink: true }}
               {...register("date")}
               error={!!errors.date}
@@ -118,30 +144,31 @@ export function ExpensesFormDialog({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TextField
-              label="Categoria"
               select
+              label="Categoria"
+              fullWidth
               {...register("category")}
               error={!!errors.category}
               helperText={errors.category?.message}
             >
-              {expenseCategories.map((category) => (
-                <MenuItem key={category} value={category}>
-                  {category}
+              {expenseCategories.map((item) => (
+                <MenuItem key={item} value={item}>
+                  {item}
                 </MenuItem>
               ))}
             </TextField>
           </Grid>
 
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Controller
               name="amount"
               control={control}
               render={({ field }) => (
                 <CurrencyField
                   label="Valor do gasto"
-                  value={field.value ? String(field.value).replace(".", ",") : ""}
+                  value={toCurrencyFieldValue(field.value)}
                   onValueChange={(values) => {
                     field.onChange(parseCurrencyToNumber(values.formattedValue));
                   }}
@@ -152,9 +179,45 @@ export function ExpensesFormDialog({
             />
           </Grid>
 
+          {isFuelCategory ? (
+            <>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <Controller
+                  name="compensate_automatic_fuel"
+                  control={control}
+                  render={({ field }) => (
+                    <TextField
+                      select
+                      fullWidth
+                      label="Tratamento do combustível automático"
+                      value={field.value ? "compensate" : "sum"}
+                      onChange={(event) =>
+                        field.onChange(event.target.value === "compensate")
+                      }
+                    >
+                      <MenuItem value="sum">Somar normalmente ao total</MenuItem>
+                      <MenuItem value="compensate">
+                        Compensar combustível automático
+                      </MenuItem>
+                    </TextField>
+                  )}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12 }}>
+                <Alert severity="info">
+                  Ao compensar, o sistema abate primeiro o combustível automático
+                  estimado. Apenas o excedente permanece como gasto manual
+                  considerado no total.
+                </Alert>
+              </Grid>
+            </>
+          ) : null}
+
           <Grid size={{ xs: 12 }}>
             <TextField
               label="Observações"
+              fullWidth
               multiline
               minRows={3}
               {...register("notes")}

@@ -14,49 +14,62 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
-import LockRoundedIcon from "@mui/icons-material/LockRounded";
-import type { Earning } from "../../../types/database";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+
+import { AppCard } from "../../../components/common/AppCard";
+import { EmptyState } from "../../../components/common/EmptyState";
+import type { AppMode, Earning } from "../../../types/database";
 import {
   formatCurrency,
   formatDate,
+  getAutomaticFuelCost,
   getEarningPerHour,
   getEarningPerKm,
 } from "../earnings.utils";
-import { EmptyState } from "../../../components/common/EmptyState";
-import { AppCard } from "../../../components/common/AppCard";
 
 type Props = {
   items: Earning[];
+  isPremium: boolean;
+  appMode: AppMode;
   onEdit: (item: Earning) => void;
   onDelete: (item: Earning) => void;
-  isPremium: boolean;
 };
 
-const vehicleTypeLabel: Record<string, string> = {
-  car: "Carro",
-  motorcycle: "Moto",
-  bicycle: "Bicicleta",
-};
+function getVehicleLabel(vehicleType: Earning["vehicle_type"]) {
+  switch (vehicleType) {
+    case "car":
+      return "Carro";
+    case "motorcycle":
+      return "Moto";
+    case "bicycle":
+      return "Bicicleta";
+    default:
+      return vehicleType;
+  }
+}
 
 export function EarningsTable({
   items,
+  isPremium,
+  appMode,
   onEdit,
   onDelete,
-  isPremium,
 }: Props) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isDriverMode = appMode === "driver";
 
   if (!items.length) {
     return (
-      <Paper sx={{ p: 2 }}>
-        <EmptyState
-          title="Nenhum ganho encontrado"
-          description="Cadastre seu primeiro ganho para começar a acompanhar os resultados."
-        />
-      </Paper>
+      <EmptyState
+        title={isDriverMode ? "Nenhum ganho encontrado" : "Nenhuma entrada encontrada"}
+        description={
+          isDriverMode
+            ? "Cadastre seus ganhos para acompanhar seu resultado financeiro."
+            : "Cadastre suas entradas para acompanhar seu resultado financeiro."
+        }
+      />
     );
   }
 
@@ -66,93 +79,120 @@ export function EarningsTable({
         {items.map((item) => {
           const earningPerKm = getEarningPerKm(item);
           const earningPerHour = getEarningPerHour(item);
+          const automaticFuel = getAutomaticFuelCost(item);
 
           return (
             <AppCard key={item.id}>
-              <Stack spacing={1.2}>
+              <Stack spacing={1.25}>
                 <Stack
                   direction="row"
                   justifyContent="space-between"
-                  alignItems="center"
+                  alignItems="flex-start"
+                  spacing={2}
                 >
-                  <Typography variant="subtitle1" fontWeight={700}>
-                    {formatCurrency(item.gross_amount)}
-                  </Typography>
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {isDriverMode ? item.platform || "Ganho" : "Entrada"}
+                    </Typography>
 
-                  <Stack direction="row" spacing={0.5}>
-                    <IconButton size="small" onClick={() => onEdit(item)}>
-                      <EditRoundedIcon fontSize="small" />
-                    </IconButton>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatDate(item.date)}
+                    </Typography>
+                  </Box>
 
-                    <IconButton
+                  {isDriverMode ? (
+                    <Chip
                       size="small"
-                      color="error"
-                      onClick={() => onDelete(item)}
-                    >
-                      <DeleteRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
+                      label={getVehicleLabel(item.vehicle_type)}
+                      color="primary"
+                    />
+                  ) : (
+                    <Chip size="small" label="Financeiro" color="primary" />
+                  )}
                 </Stack>
 
-                <Typography variant="body2" color="text.secondary">
-                  {formatDate(item.date)} •{" "}
-                  {vehicleTypeLabel[item.vehicle_type] || item.vehicle_type}
+                <Typography variant="h6">
+                  {formatCurrency(item.gross_amount)}
                 </Typography>
 
-                <Typography variant="body2">
-                  Plataforma: {item.platform || "-"}
-                </Typography>
+                {isDriverMode ? (
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {item.auto_fuel_enabled ? (
+                      <Chip
+                        size="small"
+                        color="success"
+                        label="Combustível automático ativo"
+                      />
+                    ) : (
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label="Sem combustível automático"
+                      />
+                    )}
+                  </Stack>
+                ) : null}
 
-                <Typography variant="body2">
-                  KM: {item.km_traveled ?? "-"}
-                </Typography>
+                <Stack spacing={0.5}>
+                  {isDriverMode && item.km_traveled ? (
+                    <Typography variant="body2" color="text.secondary">
+                      KM: {item.km_traveled}
+                    </Typography>
+                  ) : null}
 
-                <Typography variant="body2">
-                  R$/KM:{" "}
-                  {isPremium ? (
-                    earningPerKm ? formatCurrency(earningPerKm) : "-"
-                  ) : (
-                    <Chip
-                      size="small"
-                      icon={<LockRoundedIcon />}
-                      label="Premium"
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-                </Typography>
+                  {isDriverMode && item.work_hours ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Horas: {item.work_hours}
+                    </Typography>
+                  ) : null}
 
-                <Typography variant="body2">
-                  Horas: {item.work_hours ?? "-"}
-                </Typography>
+                  {isDriverMode && item.trips_count ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Corridas: {item.trips_count}
+                    </Typography>
+                  ) : null}
 
-                <Typography variant="body2">
-                  R$/hora:{" "}
-                  {isPremium ? (
-                    earningPerHour ? formatCurrency(earningPerHour) : "-"
-                  ) : (
-                    <Chip
-                      size="small"
-                      icon={<LockRoundedIcon />}
-                      label="Premium"
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-                </Typography>
+                  {isDriverMode && isPremium && earningPerKm !== null ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Ganho/KM: {formatCurrency(earningPerKm)}
+                    </Typography>
+                  ) : null}
 
-                <Typography variant="body2">
-                  Corridas: {item.trips_count ?? "-"}
-                </Typography>
+                  {isDriverMode && earningPerHour !== null ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Ganho/hora: {formatCurrency(earningPerHour)}
+                    </Typography>
+                  ) : null}
+
+                  {isDriverMode && isPremium && item.auto_fuel_enabled ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Combustível estimado:{" "}
+                      {automaticFuel !== null
+                        ? formatCurrency(automaticFuel)
+                        : "Preencha KM, consumo e preço"}
+                    </Typography>
+                  ) : null}
+                </Stack>
 
                 {item.notes ? (
                   <Box>
                     <Typography variant="caption" color="text.secondary">
                       Observações
                     </Typography>
+
                     <Typography variant="body2">{item.notes}</Typography>
                   </Box>
                 ) : null}
+
+                <Stack direction="row" spacing={1}>
+                  <IconButton onClick={() => onEdit(item)}>
+                    <EditRoundedIcon />
+                  </IconButton>
+
+                  <IconButton onClick={() => onDelete(item)} color="error">
+                    <DeleteRoundedIcon />
+                  </IconButton>
+                </Stack>
               </Stack>
             </AppCard>
           );
@@ -161,20 +201,57 @@ export function EarningsTable({
     );
   }
 
+  if (!isDriverMode) {
+    return (
+      <TableContainer component={Paper} variant="outlined">
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Data</TableCell>
+              <TableCell>Tipo</TableCell>
+              <TableCell>Valor</TableCell>
+              <TableCell>Observações</TableCell>
+              <TableCell align="right">Ações</TableCell>
+            </TableRow>
+          </TableHead>
+
+          <TableBody>
+            {items.map((item) => (
+              <TableRow key={item.id} hover>
+                <TableCell>{formatDate(item.date)}</TableCell>
+                <TableCell>Entrada</TableCell>
+                <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
+                <TableCell>{item.notes || "-"}</TableCell>
+                <TableCell align="right">
+                  <IconButton onClick={() => onEdit(item)}>
+                    <EditRoundedIcon />
+                  </IconButton>
+
+                  <IconButton onClick={() => onDelete(item)} color="error">
+                    <DeleteRoundedIcon />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  }
+
   return (
-    <TableContainer component={Paper}>
-      <Table size="small" sx={{ minWidth: 960 }}>
+    <TableContainer component={Paper} variant="outlined">
+      <Table>
         <TableHead>
           <TableRow>
             <TableCell>Data</TableCell>
-            <TableCell>Veículo</TableCell>
             <TableCell>Plataforma</TableCell>
-            <TableCell align="right">Ganho bruto</TableCell>
-            <TableCell align="right">KM</TableCell>
-            <TableCell align="right">R$/KM</TableCell>
-            <TableCell align="right">Horas</TableCell>
-            <TableCell align="right">R$/hora</TableCell>
-            <TableCell align="right">Corridas</TableCell>
+            <TableCell>Veículo</TableCell>
+            <TableCell>Ganho bruto</TableCell>
+            <TableCell>KM</TableCell>
+            <TableCell>Ganho/KM</TableCell>
+            <TableCell>Combustível automático</TableCell>
+            <TableCell>Combustível estimado</TableCell>
             <TableCell>Observações</TableCell>
             <TableCell align="right">Ações</TableCell>
           </TableRow>
@@ -183,66 +260,43 @@ export function EarningsTable({
         <TableBody>
           {items.map((item) => {
             const earningPerKm = getEarningPerKm(item);
-            const earningPerHour = getEarningPerHour(item);
+            const automaticFuel = getAutomaticFuelCost(item);
 
             return (
               <TableRow key={item.id} hover>
                 <TableCell>{formatDate(item.date)}</TableCell>
-                <TableCell>
-                  {vehicleTypeLabel[item.vehicle_type] || item.vehicle_type}
-                </TableCell>
                 <TableCell>{item.platform || "-"}</TableCell>
-                <TableCell align="right">
-                  {formatCurrency(item.gross_amount)}
-                </TableCell>
-                <TableCell align="right">{item.km_traveled ?? "-"}</TableCell>
-                <TableCell align="right">
-                  {isPremium ? (
-                    earningPerKm ? formatCurrency(earningPerKm) : "-"
-                  ) : (
-                    <Chip
-                      size="small"
-                      icon={<LockRoundedIcon />}
-                      label="Premium"
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-                </TableCell>
-                <TableCell align="right">{item.work_hours ?? "-"}</TableCell>
-                <TableCell align="right">
-                  {isPremium ? (
-                    earningPerHour ? formatCurrency(earningPerHour) : "-"
-                  ) : (
-                    <Chip
-                      size="small"
-                      icon={<LockRoundedIcon />}
-                      label="Premium"
-                      color="success"
-                      variant="outlined"
-                    />
-                  )}
-                </TableCell>
-                <TableCell align="right">{item.trips_count ?? "-"}</TableCell>
+                <TableCell>{getVehicleLabel(item.vehicle_type)}</TableCell>
+                <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
+                <TableCell>{item.km_traveled ?? "-"}</TableCell>
                 <TableCell>
-                  <Typography
-                    variant="body2"
-                    noWrap
-                    sx={{ maxWidth: 180 }}
-                    title={item.notes ?? ""}
-                  >
-                    {item.notes || "-"}
-                  </Typography>
+                  {isPremium && earningPerKm !== null
+                    ? formatCurrency(earningPerKm)
+                    : "-"}
                 </TableCell>
+                <TableCell>
+                  {item.auto_fuel_enabled ? (
+                    <Chip size="small" color="success" label="Ativo" />
+                  ) : (
+                    <Chip size="small" variant="outlined" label="Não" />
+                  )}
+                </TableCell>
+                <TableCell>
+                  {isPremium && item.auto_fuel_enabled
+                    ? automaticFuel !== null
+                      ? formatCurrency(automaticFuel)
+                      : "Preencha KM, consumo e preço"
+                    : "-"}
+                </TableCell>
+                <TableCell>{item.notes || "-"}</TableCell>
                 <TableCell align="right">
-                  <Stack direction="row" justifyContent="flex-end">
-                    <IconButton onClick={() => onEdit(item)}>
-                      <EditRoundedIcon fontSize="small" />
-                    </IconButton>
-                    <IconButton color="error" onClick={() => onDelete(item)}>
-                      <DeleteRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
+                  <IconButton onClick={() => onEdit(item)}>
+                    <EditRoundedIcon />
+                  </IconButton>
+
+                  <IconButton onClick={() => onDelete(item)} color="error">
+                    <DeleteRoundedIcon />
+                  </IconButton>
                 </TableCell>
               </TableRow>
             );

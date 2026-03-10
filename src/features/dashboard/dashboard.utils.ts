@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+
 import type { Earning } from "../../types/database";
 import type { ExpenseListItem } from "../expenses/expenses.types";
 
@@ -83,6 +84,8 @@ export function getRecentActivity(
     title:
       item.source === "automatic_fuel"
         ? "Combustível automático"
+        : item.compensate_automatic_fuel
+        ? "Combustível manual compensado"
         : item.category,
     date: item.date,
     amount: item.amount,

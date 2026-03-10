@@ -10,8 +10,6 @@ function nullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-// Serviço central dos ganhos.
-// Todo acesso ao banco fica aqui, facilitando manutenção e reaproveitamento.
 export const earningsService = {
   async listByPeriod(userId: string, startDate: string, endDate: string) {
     const { data, error } = await supabase
@@ -24,7 +22,6 @@ export const earningsService = {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return (data ?? []) as Earning[];
   },
 
@@ -37,6 +34,7 @@ export const earningsService = {
       km_traveled: nullableNumber(values.km_traveled),
       fuel_efficiency: nullableNumber(values.fuel_efficiency),
       fuel_price: nullableNumber(values.fuel_price),
+      auto_fuel_enabled: values.auto_fuel_enabled,
       platform: nullableString(values.platform),
       work_hours: nullableNumber(values.work_hours),
       trips_count: nullableNumber(values.trips_count),
@@ -44,7 +42,6 @@ export const earningsService = {
     };
 
     const { error } = await supabase.from("earnings").insert(payload);
-
     if (error) throw error;
   },
 
@@ -57,6 +54,7 @@ export const earningsService = {
       km_traveled: nullableNumber(values.km_traveled),
       fuel_efficiency: nullableNumber(values.fuel_efficiency),
       fuel_price: nullableNumber(values.fuel_price),
+      auto_fuel_enabled: values.auto_fuel_enabled,
       platform: nullableString(values.platform),
       work_hours: nullableNumber(values.work_hours),
       trips_count: nullableNumber(values.trips_count),

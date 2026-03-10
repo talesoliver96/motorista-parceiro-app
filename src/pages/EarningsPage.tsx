@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pagination, Stack, Typography } from "@mui/material";
+import { useSnackbar } from "notistack";
+
 import { PageContainer } from "../components/common/PageContainer";
+import { AppCard } from "../components/common/AppCard";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { useAuth } from "../app/providers/AuthProvider";
-import type { Earning } from "../types/database";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 import { earningsService } from "../features/earnings/earnings.service";
 import { EarningsToolbar } from "../features/earnings/components/EarningsToolbar";
 import { EarningsTable } from "../features/earnings/components/EarningsTable";
 import { EarningsFormDialog } from "../features/earnings/components/EarningsFormDialog";
-import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import type { Earning } from "../types/database";
 import type { EarningFormValues } from "../features/earnings/earnings.schemas";
 import {
   formatCurrency,
+  getAutomaticFuelCost,
   getCurrentMonthRange,
 } from "../features/earnings/earnings.utils";
-import { AppCard } from "../components/common/AppCard";
-import { useSnackbar } from "notistack";
-import { isPremiumProfile } from "../features/premium/premium.utils";
 import {
   getSmartListPageSize,
   getTotalPages,
@@ -25,8 +27,9 @@ import {
 export function EarningsPage() {
   const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
-
   const isPremium = isPremiumProfile(profile);
+  const appMode = profile?.app_mode ?? "driver";
+  const isDriverMode = appMode === "driver";
 
   const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
@@ -35,6 +38,7 @@ export function EarningsPage() {
   const [items, setItems] = useState<Earning[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [page, setPage] = useState(1);
 
   const [formOpen, setFormOpen] = useState(false);
@@ -42,6 +46,28 @@ export function EarningsPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Earning | null>(null);
+
+  const loadData = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      const data = await earningsService.listByPeriod(user.id, startDate, endDate);
+      setItems(data);
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao carregar ganhos", {
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setPage(1);
+    void loadData();
+  }, [user, startDate, endDate]);
 
   const pageSize = useMemo(
     () => getSmartListPageSize(startDate, endDate),
@@ -58,41 +84,19 @@ export function EarningsPage() {
     [items, page, pageSize]
   );
 
-  const loadData = async () => {
-    if (!user) return;
-
-    try {
-      setLoading(true);
-      const data = await earningsService.listByPeriod(
-        user.id,
-        startDate,
-        endDate
-      );
-      setItems(data);
-    } catch (error) {
-      console.error(error);
-      enqueueSnackbar("Erro ao carregar ganhos", {
-        variant: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    setPage(1);
-    loadData();
-  }, [user, startDate, endDate]);
-
   const totalGross = useMemo(
     () => items.reduce((acc, item) => acc + Number(item.gross_amount || 0), 0),
     [items]
   );
 
-  const totalKm = useMemo(
-    () => items.reduce((acc, item) => acc + Number(item.km_traveled || 0), 0),
-    [items]
-  );
+  const totalAutomaticFuel = useMemo(() => {
+    if (!isPremium || !isDriverMode) return 0;
+
+    return items.reduce((acc, item) => {
+      const value = getAutomaticFuelCost(item);
+      return acc + Number(value || 0);
+    }, 0);
+  }, [items, isPremium, isDriverMode]);
 
   const handleCreate = () => {
     setSelectedItem(null);
@@ -117,14 +121,24 @@ export function EarningsPage() {
 
       if (selectedItem) {
         await earningsService.update(selectedItem.id, user.id, values);
-        enqueueSnackbar("Ganho atualizado com sucesso", {
-          variant: "success",
-        });
+        enqueueSnackbar(
+          isDriverMode
+            ? "Ganho atualizado com sucesso"
+            : "Entrada atualizada com sucesso",
+          {
+            variant: "success",
+          }
+        );
       } else {
         await earningsService.create(user.id, values);
-        enqueueSnackbar("Ganho cadastrado com sucesso", {
-          variant: "success",
-        });
+        enqueueSnackbar(
+          isDriverMode
+            ? "Ganho cadastrado com sucesso"
+            : "Entrada cadastrada com sucesso",
+          {
+            variant: "success",
+          }
+        );
       }
 
       setFormOpen(false);
@@ -132,9 +146,12 @@ export function EarningsPage() {
       await loadData();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Erro ao salvar ganho", {
-        variant: "error",
-      });
+      enqueueSnackbar(
+        isDriverMode ? "Erro ao salvar ganho" : "Erro ao salvar entrada",
+        {
+          variant: "error",
+        }
+      );
     } finally {
       setSaving(false);
     }
@@ -145,20 +162,29 @@ export function EarningsPage() {
 
     try {
       setSaving(true);
+
       await earningsService.remove(itemToDelete.id, user.id);
 
-      enqueueSnackbar("Ganho excluído com sucesso", {
-        variant: "success",
-      });
+      enqueueSnackbar(
+        isDriverMode
+          ? "Ganho excluído com sucesso"
+          : "Entrada excluída com sucesso",
+        {
+          variant: "success",
+        }
+      );
 
       setDeleteOpen(false);
       setItemToDelete(null);
       await loadData();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Erro ao excluir ganho", {
-        variant: "error",
-      });
+      enqueueSnackbar(
+        isDriverMode ? "Erro ao excluir ganho" : "Erro ao excluir entrada",
+        {
+          variant: "error",
+        }
+      );
     } finally {
       setSaving(false);
     }
@@ -168,97 +194,123 @@ export function EarningsPage() {
     <PageContainer>
       <Stack spacing={3}>
         <Stack spacing={0.5}>
-          <Typography variant="h4">Ganhos</Typography>
+          <Typography variant="h4">
+            {isDriverMode ? "Ganhos" : "Entradas"}
+          </Typography>
           <Typography color="text.secondary">
-            Cadastre e acompanhe seus ganhos do período.
+            {isDriverMode
+              ? "Registre seus ganhos e acompanhe sua operação com mais precisão."
+              : "Registre suas entradas financeiras e acompanhe sua evolução com clareza."}
           </Typography>
         </Stack>
 
-        {isPremium ? (
-          <Alert severity="success">
-            Sua conta premium libera cálculo por KM, por hora e combustível automático.
-          </Alert>
+        {isDriverMode ? (
+          isPremium ? (
+            <Alert severity="success">
+              Sua conta premium permite ativar o cálculo automático de combustível
+              por ganho, usando KM, consumo e preço informado.
+            </Alert>
+          ) : (
+            <Alert severity="info">
+              O cálculo automático de combustível por ganho é um recurso premium.
+            </Alert>
+          )
         ) : (
           <Alert severity="info">
-            Cálculos por KM, por hora e combustível automático estão disponíveis no plano premium.
+            No modo controle financeiro essencial, esta tela registra entradas sem
+            dados operacionais de motorista.
           </Alert>
         )}
+
+        <AppCard>
+          <Stack spacing={2}>
+            <EarningsToolbar
+              startDate={startDate}
+              endDate={endDate}
+              onChangeStartDate={setStartDate}
+              onChangeEndDate={setEndDate}
+              onClickAdd={handleCreate}
+            />
+          </Stack>
+        </AppCard>
 
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <AppCard sx={{ flex: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              Ganho bruto do período
+              {isDriverMode ? "Ganho bruto no período" : "Entradas no período"}
             </Typography>
             <Typography variant="h5">{formatCurrency(totalGross)}</Typography>
           </AppCard>
 
-          <AppCard sx={{ flex: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              KM total do período
-            </Typography>
-            <Typography variant="h5">
-              {totalKm > 0 ? totalKm.toFixed(2) : "-"}
-            </Typography>
-          </AppCard>
+          {isDriverMode ? (
+            <AppCard sx={{ flex: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Combustível automático estimado
+              </Typography>
+              <Typography variant="h5">
+                {isPremium ? formatCurrency(totalAutomaticFuel) : "Premium"}
+              </Typography>
+            </AppCard>
+          ) : null}
         </Stack>
 
-        <EarningsToolbar
-          startDate={startDate}
-          endDate={endDate}
-          onChangeStartDate={setStartDate}
-          onChangeEndDate={setEndDate}
-          onClickAdd={handleCreate}
-        />
-
         {loading ? (
-          <AppCard>
-            <Typography>Carregando ganhos...</Typography>
-          </AppCard>
+          <Typography color="text.secondary">
+            {isDriverMode ? "Carregando ganhos..." : "Carregando entradas..."}
+          </Typography>
         ) : (
           <>
             <EarningsTable
               items={paginatedItems}
+              isPremium={isPremium}
+              appMode={appMode}
               onEdit={handleEdit}
               onDelete={handleDeleteRequest}
-              isPremium={isPremium}
             />
 
-            <Stack direction="row" justifyContent="flex-end">
+            {totalPages > 1 ? (
               <Pagination
                 page={page}
                 count={totalPages}
                 onChange={(_, value) => setPage(value)}
                 color="primary"
               />
-            </Stack>
+            ) : null}
           </>
         )}
+
+        <EarningsFormDialog
+          open={formOpen}
+          loading={saving}
+          initialData={selectedItem}
+          appMode={appMode}
+          onClose={() => {
+            if (saving) return;
+            setFormOpen(false);
+            setSelectedItem(null);
+          }}
+          onSubmit={handleSubmit}
+        />
+
+        <ConfirmDialog
+          open={deleteOpen}
+          loading={saving}
+          title={isDriverMode ? "Excluir ganho" : "Excluir entrada"}
+          description={
+            isDriverMode
+              ? "Esta ação removerá o ganho selecionado. Deseja continuar?"
+              : "Esta ação removerá a entrada selecionada. Deseja continuar?"
+          }
+          onClose={() => {
+            if (saving) return;
+            setDeleteOpen(false);
+            setItemToDelete(null);
+          }}
+          onConfirm={() => {
+            void handleConfirmDelete();
+          }}
+        />
       </Stack>
-
-      <EarningsFormDialog
-        open={formOpen}
-        loading={saving}
-        initialData={selectedItem}
-        onClose={() => {
-          if (saving) return;
-          setFormOpen(false);
-          setSelectedItem(null);
-        }}
-        onSubmit={handleSubmit}
-      />
-
-      <ConfirmDialog
-        open={deleteOpen}
-        loading={saving}
-        title="Excluir ganho"
-        description="Tem certeza que deseja excluir este ganho? Esta ação não pode ser desfeita."
-        onClose={() => {
-          if (saving) return;
-          setDeleteOpen(false);
-          setItemToDelete(null);
-        }}
-        onConfirm={handleConfirmDelete}
-      />
     </PageContainer>
   );
 }

@@ -10,6 +10,9 @@ export const authService = {
         data: {
           name: data.name,
           phone: data.phone,
+          app_mode: data.appMode,
+          wallet_enabled: false,
+          wallet_balance: 0,
         },
       },
     });
@@ -37,15 +40,12 @@ export const authService = {
 
   async signOut() {
     const { error } = await supabase.auth.signOut();
-
     if (error) throw error;
   },
 
   async getSession() {
     const { data, error } = await supabase.auth.getSession();
-
     if (error) throw error;
-
     return data.session;
   },
 

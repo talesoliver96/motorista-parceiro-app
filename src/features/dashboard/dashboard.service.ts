@@ -8,7 +8,7 @@ import {
   sumGross,
   sumKm,
 } from "./dashboard.utils";
-import { buildAutomaticFuelExpenses } from "../expenses/expenses.utils";
+import { buildReconciledExpenseData } from "../expenses/expenses.utils";
 import type { ExpenseListItem } from "../expenses/expenses.types";
 
 export type DashboardData = {
@@ -60,19 +60,13 @@ export const dashboardService = {
     const earnings = (earningsResult.data ?? []) as Earning[];
     const manualExpenses = (expensesResult.data ?? []) as Expense[];
 
-    const automaticFuelExpenses = isPremium
-      ? buildAutomaticFuelExpenses(earnings)
-      : [];
+    const reconciled = buildReconciledExpenseData(
+      manualExpenses,
+      earnings,
+      isPremium
+    );
 
-    const expenses: ExpenseListItem[] = [
-      ...manualExpenses.map((item) => ({
-        ...item,
-        source: "manual" as const,
-        isReadonly: false,
-      })),
-      ...automaticFuelExpenses,
-    ];
-
+    const expenses = reconciled.items;
     const gross = sumGross(earnings);
     const totalExpenses = sumExpenses(expenses);
     const net = gross - totalExpenses;
@@ -88,9 +82,7 @@ export const dashboardService = {
       km,
       earningPerKm,
       chartData: groupEarningsByDay(earnings),
-      projection: isPremium
-        ? calculateProjection(gross, startDate, endDate)
-        : null,
+      projection: isPremium ? calculateProjection(gross, startDate, endDate) : null,
       recentActivity: getRecentActivity(earnings, expenses),
     } satisfies DashboardData;
   },

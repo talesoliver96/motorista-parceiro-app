@@ -6,6 +6,11 @@ function nullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function isFuelCategory(category: string) {
+  return category.trim().toLowerCase() === "combustível" ||
+    category.trim().toLowerCase() === "combustivel";
+}
+
 export const expensesService = {
   async listByPeriod(userId: string, startDate: string, endDate: string) {
     const { data, error } = await supabase
@@ -18,7 +23,6 @@ export const expensesService = {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-
     return (data ?? []) as Expense[];
   },
 
@@ -28,11 +32,12 @@ export const expensesService = {
       date: values.date,
       category: values.category,
       amount: values.amount,
+      compensate_automatic_fuel:
+        isFuelCategory(values.category) && values.compensate_automatic_fuel,
       notes: nullableString(values.notes),
     };
 
     const { error } = await supabase.from("expenses").insert(payload);
-
     if (error) throw error;
   },
 
@@ -42,6 +47,8 @@ export const expensesService = {
       date: values.date,
       category: values.category,
       amount: values.amount,
+      compensate_automatic_fuel:
+        isFuelCategory(values.category) && values.compensate_automatic_fuel,
       notes: nullableString(values.notes),
     };
 

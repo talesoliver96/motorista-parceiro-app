@@ -72,6 +72,8 @@ export function ReportsPage() {
   const { enqueueSnackbar } = useSnackbar();
 
   const isPremium = isPremiumProfile(profile);
+  const appMode = profile?.app_mode ?? "driver";
+  const isDriverMode = appMode === "driver";
 
   const initialRange = useMemo(() => getCurrentMonthRange(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
@@ -125,9 +127,13 @@ export function ReportsPage() {
     <PageContainer>
       <Stack spacing={3}>
         <Stack spacing={0.5}>
-          <Typography variant="h4">Relatórios</Typography>
+          <Typography variant="h4">
+            {isDriverMode ? "Relatórios" : "Análises"}
+          </Typography>
           <Typography color="text.secondary">
-            Analise ganhos, gastos, combustível automático e desempenho líquido do período.
+            {isDriverMode
+              ? "Analise ganhos, gastos, combustível automático e desempenho líquido do período."
+              : "Analise entradas, saídas e resultado líquido do período com uma visão financeira mais avançada."}
           </Typography>
         </Stack>
 
@@ -135,8 +141,16 @@ export function ReportsPage() {
           <AppSkeleton />
         ) : !isPremium ? (
           <PremiumLockedState
-            title="Relatórios avançados são premium"
-            description="Libere gráficos, melhores dias líquidos, custo automático de combustível e visão avançada do seu desempenho."
+            title={
+              isDriverMode
+                ? "Relatórios avançados são premium"
+                : "Análises avançadas são premium"
+            }
+            description={
+              isDriverMode
+                ? "Libere gráficos, melhores dias líquidos, custo automático de combustível e visão avançada do seu desempenho."
+                : "Libere gráficos, melhores dias líquidos e visão analítica mais completa da sua movimentação financeira."
+            }
           />
         ) : (
           <>
@@ -152,10 +166,10 @@ export function ReportsPage() {
             ) : (
               <>
                 <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                  <Grid size={{ xs: 12, sm: 6, lg: isDriverMode ? 4 : 4 }}>
                     <AppCard>
                       <Typography variant="body2" color="text.secondary">
-                        Ganho bruto
+                        {isDriverMode ? "Ganho bruto" : "Entradas"}
                       </Typography>
                       <Typography variant="h5">
                         {formatCurrency(data.gross)}
@@ -163,7 +177,7 @@ export function ReportsPage() {
                     </AppCard>
                   </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                  <Grid size={{ xs: 12, sm: 6, lg: isDriverMode ? 4 : 4 }}>
                     <AppCard>
                       <Typography variant="body2" color="text.secondary">
                         Gastos manuais
@@ -174,18 +188,20 @@ export function ReportsPage() {
                     </AppCard>
                   </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                    <AppCard>
-                      <Typography variant="body2" color="text.secondary">
-                        Combustível automático
-                      </Typography>
-                      <Typography variant="h5">
-                        {formatCurrency(data.automaticFuelTotal)}
-                      </Typography>
-                    </AppCard>
-                  </Grid>
+                  {isDriverMode ? (
+                    <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                      <AppCard>
+                        <Typography variant="body2" color="text.secondary">
+                          Combustível automático
+                        </Typography>
+                        <Typography variant="h5">
+                          {formatCurrency(data.automaticFuelTotal)}
+                        </Typography>
+                      </AppCard>
+                    </Grid>
+                  ) : null}
 
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                  <Grid size={{ xs: 12, sm: 6, lg: isDriverMode ? 4 : 4 }}>
                     <AppCard>
                       <Typography variant="body2" color="text.secondary">
                         Total de gastos
@@ -196,10 +212,10 @@ export function ReportsPage() {
                     </AppCard>
                   </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                  <Grid size={{ xs: 12, sm: 6, lg: isDriverMode ? 4 : 4 }}>
                     <AppCard>
                       <Typography variant="body2" color="text.secondary">
-                        Lucro líquido
+                        {isDriverMode ? "Lucro líquido" : "Resultado líquido"}
                       </Typography>
                       <Typography
                         variant="h5"
@@ -210,36 +226,42 @@ export function ReportsPage() {
                     </AppCard>
                   </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                    <AppCard>
-                      <Typography variant="body2" color="text.secondary">
-                        KM total
-                      </Typography>
-                      <Typography variant="h5">
-                        {data.totalKm > 0 ? data.totalKm.toFixed(2) : "-"}
-                      </Typography>
-                    </AppCard>
-                  </Grid>
+                  {isDriverMode ? (
+                    <>
+                      <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                        <AppCard>
+                          <Typography variant="body2" color="text.secondary">
+                            KM total
+                          </Typography>
+                          <Typography variant="h5">
+                            {data.totalKm > 0 ? data.totalKm.toFixed(2) : "-"}
+                          </Typography>
+                        </AppCard>
+                      </Grid>
 
-                  <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-                    <AppCard>
-                      <Typography variant="body2" color="text.secondary">
-                        Ganho por KM
-                      </Typography>
-                      <Typography variant="h5">
-                        {data.earningPerKm
-                          ? formatCurrency(data.earningPerKm)
-                          : "-"}
-                      </Typography>
-                    </AppCard>
-                  </Grid>
+                      <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                        <AppCard>
+                          <Typography variant="body2" color="text.secondary">
+                            Ganho por KM
+                          </Typography>
+                          <Typography variant="h5">
+                            {data.earningPerKm
+                              ? formatCurrency(data.earningPerKm)
+                              : "-"}
+                          </Typography>
+                        </AppCard>
+                      </Grid>
+                    </>
+                  ) : null}
                 </Grid>
 
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, lg: 7 }}>
                     <AppCard sx={{ height: 380 }}>
                       <Typography variant="h6" gutterBottom>
-                        Ganhos por dia da semana
+                        {isDriverMode
+                          ? "Ganhos por dia da semana"
+                          : "Entradas por dia da semana"}
                       </Typography>
 
                       <ResponsiveContainer width="100%" height={300}>
@@ -297,7 +319,9 @@ export function ReportsPage() {
                   <Grid size={{ xs: 12 }}>
                     <AppCard>
                       <Typography variant="h6" gutterBottom>
-                        Melhores dias líquidos do período
+                        {isDriverMode
+                          ? "Melhores dias líquidos do período"
+                          : "Melhores resultados líquidos do período"}
                       </Typography>
 
                       <TableContainer component={Paper} variant="outlined">
@@ -305,9 +329,13 @@ export function ReportsPage() {
                           <TableHead>
                             <TableRow>
                               <TableCell>Data</TableCell>
-                              <TableCell align="right">Bruto</TableCell>
+                              <TableCell align="right">
+                                {isDriverMode ? "Bruto" : "Entradas"}
+                              </TableCell>
                               <TableCell align="right">Gastos</TableCell>
-                              <TableCell align="right">Líquido</TableCell>
+                              <TableCell align="right">
+                                {isDriverMode ? "Líquido" : "Resultado"}
+                              </TableCell>
                             </TableRow>
                           </TableHead>
 

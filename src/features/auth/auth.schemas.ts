@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Schema de cadastro.
-// Centralizar validação aqui evita duplicação no componente.
 export const registerSchema = z.object({
   name: z
     .string()
@@ -16,6 +14,9 @@ export const registerSchema = z.object({
     .string()
     .min(6, "A senha deve ter pelo menos 6 caracteres")
     .max(72, "Senha muito longa"),
+  appMode: z.enum(["driver", "basic"], {
+    error: "Selecione a experiência desejada",
+  }),
 });
 
 export const loginSchema = z.object({

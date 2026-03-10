@@ -9,10 +9,12 @@ export const expenseSchema = z.object({
     (value) => Number(value),
     z.number().positive("O gasto deve ser maior que zero")
   ),
+  compensate_automatic_fuel: z.boolean(),
   notes: optionalText,
 });
 
-export type ExpenseFormData = z.infer<typeof expenseSchema>;
+export type ExpenseFormInput = z.input<typeof expenseSchema>;
+export type ExpenseFormData = z.output<typeof expenseSchema>;
 
 export const expenseCategories = [
   "Combustível",

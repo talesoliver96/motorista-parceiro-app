@@ -37,7 +37,7 @@ export function AppRoutes() {
       />
 
       <Route
-        path="/cadastro"
+        path="/register"
         element={
           <PublicOnlyRoute>
             <RegisterPage />

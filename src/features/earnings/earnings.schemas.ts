@@ -1,14 +1,13 @@
 import { z } from "zod";
 
-const optionalNumber = z.preprocess(
-  (value) => {
-    if (value === "" || value === null || value === undefined) return undefined;
+const optionalNumber = z.preprocess((value) => {
+  if (value === "" || value === null || value === undefined) {
+    return undefined;
+  }
 
-    const num = Number(value);
-    return Number.isNaN(num) ? undefined : num;
-  },
-  z.number().positive().optional()
-);
+  const num = Number(value);
+  return Number.isNaN(num) ? undefined : num;
+}, z.number().positive().optional());
 
 export const earningSchema = z.object({
   date: z.string().min(1, "Selecione a data"),
@@ -20,10 +19,12 @@ export const earningSchema = z.object({
   km_traveled: optionalNumber,
   fuel_efficiency: optionalNumber,
   fuel_price: optionalNumber,
+  auto_fuel_enabled: z.boolean(),
   platform: z.string().optional(),
   work_hours: optionalNumber,
   trips_count: optionalNumber,
   notes: z.string().optional(),
 });
 
-export type EarningFormValues = z.infer<typeof earningSchema>;
+export type EarningFormInput = z.input<typeof earningSchema>;
+export type EarningFormValues = z.output<typeof earningSchema>;

@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+
 import { formatCurrency, formatDate } from "../../earnings/earnings.utils";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { AppCard } from "../../../components/common/AppCard";
@@ -27,18 +28,51 @@ type Props = {
   onDelete: (item: ExpenseListItem) => void;
 };
 
+function renderValue(item: ExpenseListItem) {
+  const originalAmount = Number(item.original_amount ?? item.amount ?? 0);
+  const effectiveAmount = Number(item.amount ?? 0);
+  const compensated = Number(item.compensated_automatic_fuel_amount ?? 0);
+
+  if (item.source === "manual" && compensated > 0) {
+    return (
+      <Stack spacing={0.25}>
+        <Typography variant="body2" fontWeight={600}>
+          {formatCurrency(effectiveAmount)}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Original: {formatCurrency(originalAmount)} • Compensado:{" "}
+          {formatCurrency(compensated)}
+        </Typography>
+      </Stack>
+    );
+  }
+
+  if (item.source === "automatic_fuel" && compensated > 0) {
+    return (
+      <Stack spacing={0.25}>
+        <Typography variant="body2" fontWeight={600}>
+          {formatCurrency(effectiveAmount)}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Redução por compensação: {formatCurrency(compensated)}
+        </Typography>
+      </Stack>
+    );
+  }
+
+  return formatCurrency(effectiveAmount);
+}
+
 export function ExpensesTable({ items, onEdit, onDelete }: Props) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   if (!items.length) {
     return (
-      <Paper sx={{ p: 2 }}>
-        <EmptyState
-          title="Nenhum gasto encontrado"
-          description="Cadastre seus gastos para acompanhar o lucro líquido."
-        />
-      </Paper>
+      <EmptyState
+        title="Nenhum gasto encontrado"
+        description="Cadastre gastos para acompanhar melhor seu resultado financeiro."
+      />
     );
   }
 
@@ -47,50 +81,52 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
       <Stack spacing={2}>
         {items.map((item) => (
           <AppCard key={item.id}>
-            <Stack spacing={1.2}>
+            <Stack spacing={1.25}>
               <Stack
                 direction="row"
                 justifyContent="space-between"
-                alignItems="center"
+                alignItems="flex-start"
+                spacing={2}
               >
-                <Typography variant="subtitle1" fontWeight={700}>
-                  {formatCurrency(item.amount)}
-                </Typography>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    {item.category}
+                  </Typography>
 
-                {item.source === "manual" ? (
-                  <Stack direction="row" spacing={0.5}>
-                    <IconButton size="small" onClick={() => onEdit(item)}>
-                      <EditRoundedIcon fontSize="small" />
-                    </IconButton>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatDate(item.date)}
+                  </Typography>
+                </Box>
 
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => onDelete(item)}
-                    >
-                      <DeleteRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
-                ) : (
-                  <Chip size="small" label="Automático" color="info" />
-                )}
+                <Chip
+                  size="small"
+                  label={item.source === "manual" ? "Manual" : "Automático"}
+                  color={item.source === "manual" ? "default" : "info"}
+                />
               </Stack>
 
-              <Typography variant="body2" color="text.secondary">
-                {formatDate(item.date)}
-              </Typography>
-
-              <Typography variant="body2">
-                Categoria: {item.category}
-              </Typography>
+              <Box>{renderValue(item)}</Box>
 
               {item.notes ? (
                 <Box>
                   <Typography variant="caption" color="text.secondary">
                     Observações
                   </Typography>
+
                   <Typography variant="body2">{item.notes}</Typography>
                 </Box>
+              ) : null}
+
+              {item.source === "manual" ? (
+                <Stack direction="row" spacing={1}>
+                  <IconButton onClick={() => onEdit(item)}>
+                    <EditRoundedIcon />
+                  </IconButton>
+
+                  <IconButton onClick={() => onDelete(item)} color="error">
+                    <DeleteRoundedIcon />
+                  </IconButton>
+                </Stack>
               ) : null}
             </Stack>
           </AppCard>
@@ -100,15 +136,15 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
   }
 
   return (
-    <TableContainer component={Paper}>
-      <Table size="small" sx={{ minWidth: 760 }}>
+    <TableContainer component={Paper} variant="outlined">
+      <Table>
         <TableHead>
           <TableRow>
             <TableCell>Data</TableCell>
             <TableCell>Categoria</TableCell>
             <TableCell>Origem</TableCell>
             <TableCell>Observações</TableCell>
-            <TableCell align="right">Valor</TableCell>
+            <TableCell>Valor considerado</TableCell>
             <TableCell align="right">Ações</TableCell>
           </TableRow>
         </TableHead>
@@ -117,7 +153,9 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
           {items.map((item) => (
             <TableRow key={item.id} hover>
               <TableCell>{formatDate(item.date)}</TableCell>
+
               <TableCell>{item.category}</TableCell>
+
               <TableCell>
                 {item.source === "manual" ? (
                   <Chip size="small" label="Manual" />
@@ -125,31 +163,24 @@ export function ExpensesTable({ items, onEdit, onDelete }: Props) {
                   <Chip size="small" label="Automático" color="info" />
                 )}
               </TableCell>
-              <TableCell>
-                <Typography
-                  variant="body2"
-                  noWrap
-                  sx={{ maxWidth: 260 }}
-                  title={item.notes ?? ""}
-                >
-                  {item.notes || "-"}
-                </Typography>
-              </TableCell>
-              <TableCell align="right">{formatCurrency(item.amount)}</TableCell>
+
+              <TableCell>{item.notes || "-"}</TableCell>
+
+              <TableCell>{renderValue(item)}</TableCell>
+
               <TableCell align="right">
                 {item.source === "manual" ? (
-                  <Stack direction="row" justifyContent="flex-end">
+                  <>
                     <IconButton onClick={() => onEdit(item)}>
-                      <EditRoundedIcon fontSize="small" />
+                      <EditRoundedIcon />
                     </IconButton>
-                    <IconButton color="error" onClick={() => onDelete(item)}>
-                      <DeleteRoundedIcon fontSize="small" />
+
+                    <IconButton onClick={() => onDelete(item)} color="error">
+                      <DeleteRoundedIcon />
                     </IconButton>
-                  </Stack>
+                  </>
                 ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    -
-                  </Typography>
+                  "-"
                 )}
               </TableCell>
             </TableRow>

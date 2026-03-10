@@ -8,6 +8,9 @@ export type AdminUserListItem = {
   premium_until: string | null;
   is_admin: boolean;
   is_blocked: boolean;
+  app_mode: "driver" | "basic";
+  wallet_enabled: boolean;
+  wallet_balance: number;
   created_at: string | null;
   last_sign_in_at: string | null;
 };
@@ -23,6 +26,9 @@ export type AdminUserUpdatePayload = {
   premiumUntil?: string;
   isAdmin: boolean;
   isBlocked: boolean;
+  appMode: "driver" | "basic";
+  walletEnabled: boolean;
+  walletBalance: number;
 };
 
 export type AdminMetrics = {

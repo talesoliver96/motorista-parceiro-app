@@ -2,17 +2,21 @@ import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRou
 import { Alert, Button, Stack, Typography } from "@mui/material";
 import { AppCard } from "./AppCard";
 import { useNavigate } from "react-router-dom";
+import type { AppMode } from "../../types/database";
 
 type Props = {
   title?: string;
   description?: string;
+  appMode?: AppMode;
 };
 
 export function PremiumLockedState({
   title = "Recurso Premium",
   description = "Este recurso está disponível apenas para usuários premium.",
+  appMode = "driver",
 }: Props) {
   const navigate = useNavigate();
+  const isBasicMode = appMode === "basic";
 
   return (
     <AppCard>
@@ -25,7 +29,9 @@ export function PremiumLockedState({
         <Typography color="text.secondary">{description}</Typography>
 
         <Button variant="contained" onClick={() => navigate("/contact")}>
-          Quero liberar este recurso
+          {isBasicMode
+            ? "Quero conhecer o Premium"
+            : "Quero liberar este recurso"}
         </Button>
       </Stack>
     </AppCard>

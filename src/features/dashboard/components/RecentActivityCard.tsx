@@ -4,10 +4,11 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppCard } from "../../../components/common/AppCard";
 import { formatCurrency, formatDate } from "../../earnings/earnings.utils";
 import { getTotalPages, paginateArray } from "../../../utils/pagination";
+import type { AppMode } from "../../../types/database";
 
 type Item = {
   id: string;
@@ -19,12 +20,21 @@ type Item = {
 
 type Props = {
   items: Item[];
+  appMode?: AppMode;
 };
 
 const PAGE_SIZE = 10;
 
-export function RecentActivityCard({ items }: Props) {
+export function RecentActivityCard({
+  items,
+  appMode = "driver",
+}: Props) {
   const [page, setPage] = useState(1);
+  const isBasicMode = appMode === "basic";
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
 
   const totalPages = useMemo(
     () => getTotalPages(items.length, PAGE_SIZE),
@@ -39,11 +49,15 @@ export function RecentActivityCard({ items }: Props) {
   return (
     <AppCard sx={{ height: "100%" }}>
       <Stack spacing={2}>
-        <Typography variant="h6">Atividade recente</Typography>
+        <Typography variant="h6">
+          {isBasicMode ? "Movimentações recentes" : "Atividade recente"}
+        </Typography>
 
         {!items.length ? (
           <Typography variant="body2" color="text.secondary">
-            Nenhuma movimentação no período.
+            {isBasicMode
+              ? "Nenhuma movimentação registrada no período."
+              : "Nenhuma movimentação no período."}
           </Typography>
         ) : (
           <>
@@ -61,7 +75,15 @@ export function RecentActivityCard({ items }: Props) {
 
                     <Chip
                       size="small"
-                      label={item.type === "earning" ? "Ganho" : "Gasto"}
+                      label={
+                        item.type === "earning"
+                          ? isBasicMode
+                            ? "Entrada"
+                            : "Ganho"
+                          : isBasicMode
+                          ? "Saída"
+                          : "Gasto"
+                      }
                       color={item.type === "earning" ? "success" : "default"}
                       variant="outlined"
                     />
@@ -81,15 +103,17 @@ export function RecentActivityCard({ items }: Props) {
               ))}
             </Stack>
 
-            <Stack direction="row" justifyContent="flex-end">
-              <Pagination
-                page={page}
-                count={totalPages}
-                onChange={(_, value) => setPage(value)}
-                color="primary"
-                size="small"
-              />
-            </Stack>
+            {totalPages > 1 ? (
+              <Stack direction="row" justifyContent="flex-end">
+                <Pagination
+                  page={page}
+                  count={totalPages}
+                  onChange={(_, value) => setPage(value)}
+                  color="primary"
+                  size="small"
+                />
+              </Stack>
+            ) : null}
           </>
         )}
       </Stack>

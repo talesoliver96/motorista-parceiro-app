@@ -1,5 +1,7 @@
 export type VehicleType = "car" | "motorcycle" | "bicycle";
 
+export type AppMode = "driver" | "basic";
+
 export type Profile = {
   id: string;
   name: string;
@@ -9,6 +11,9 @@ export type Profile = {
   premium_until: string | null;
   is_admin: boolean;
   is_blocked: boolean;
+  app_mode: AppMode;
+  wallet_enabled: boolean;
+  wallet_balance: number;
   created_at: string;
   updated_at: string;
 };
@@ -22,6 +27,7 @@ export type Earning = {
   km_traveled: number | null;
   fuel_efficiency: number | null;
   fuel_price: number | null;
+  auto_fuel_enabled: boolean;
   platform: string | null;
   work_hours: number | null;
   trips_count: number | null;
@@ -36,6 +42,7 @@ export type Expense = {
   date: string;
   category: string;
   amount: number;
+  compensate_automatic_fuel: boolean;
   notes: string | null;
   created_at: string;
   updated_at: string;

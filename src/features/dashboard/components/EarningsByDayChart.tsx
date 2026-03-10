@@ -9,16 +9,23 @@ import {
 import { Box, Typography } from "@mui/material";
 import { AppCard } from "../../../components/common/AppCard";
 import { formatCurrency } from "../../earnings/earnings.utils";
+import type { AppMode } from "../../../types/database";
 
 type Props = {
   data: Array<{ date: string; value: number }>;
+  appMode?: AppMode;
 };
 
-export function EarningsByDayChart({ data }: Props) {
+export function EarningsByDayChart({
+  data,
+  appMode = "driver",
+}: Props) {
+  const isBasicMode = appMode === "basic";
+
   return (
     <AppCard sx={{ height: 360, minWidth: 0 }}>
       <Typography variant="h6" gutterBottom>
-        Ganhos por dia
+        {isBasicMode ? "Entradas por dia" : "Ganhos por dia"}
       </Typography>
 
       <Box sx={{ width: "100%", height: 280, minWidth: 0 }}>

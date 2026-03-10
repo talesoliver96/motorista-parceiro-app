@@ -45,3 +45,11 @@ export function getFuelCost(item: Earning) {
 
   return (item.km_traveled / item.fuel_efficiency) * item.fuel_price;
 }
+
+export function getAutomaticFuelCost(item: Earning) {
+  if (!item.auto_fuel_enabled) {
+    return null;
+  }
+
+  return getFuelCost(item);
+}
