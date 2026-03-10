@@ -92,9 +92,21 @@ export const adminProService = {
     return (data ?? []) as AdminActionLogItem[];
   },
 
-  async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
+  // async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
+  //   const { data, error } = await supabase
+  //     .from("premium_history")
+  //     .select("*")
+  //     .order("created_at", { ascending: false })
+  //     .limit(50);
+
+  //   if (error) throw error;
+
+  //   return (data ?? []) as PremiumHistoryItem[];
+  // },
+
+    async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
     const { data, error } = await supabase
-      .from("premium_history")
+      .from("premium_history_enriched")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
@@ -147,6 +159,8 @@ export const adminProService = {
       action: "clear_all_non_admin_users",
     });
   },
+
+  
 
   exportUsersCsv(users: AdminUserListItem[]) {
     const header = [

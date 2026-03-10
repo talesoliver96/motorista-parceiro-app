@@ -1,17 +1,76 @@
 import {
+  Alert,
   Box,
   Button,
   Container,
   Stack,
   TextField,
   Typography,
-  Alert,
 } from "@mui/material";
 import { useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 
 export function PublicContactPage() {
-  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    category: "Contato público",
+    subject: "",
+    message: "",
+  });
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      setLoading(true);
+      setSuccessMessage(null);
+      setErrorMessage(null);
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-contact-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          userId: null,
+          name: form.name,
+          email: form.email,
+          category: form.category,
+          subject: form.subject,
+          message: form.message,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Erro ao enviar mensagem");
+      }
+
+      setSuccessMessage("Mensagem enviada com sucesso.");
+      setForm({
+        name: "",
+        email: "",
+        category: "Contato público",
+        subject: "",
+        message: "",
+      });
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Não foi possível enviar a mensagem agora.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
@@ -29,18 +88,12 @@ export function PublicContactPage() {
           </Typography>
         </Stack>
 
-        {success ? (
-          <Alert severity="success">
-            Mensagem enviada com sucesso.
-          </Alert>
-        ) : null}
+        {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
+        {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
         <Box
           component="form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSuccess(true);
-          }}
+          onSubmit={onSubmit}
           sx={{
             p: 4,
             borderRadius: 5,
@@ -50,12 +103,38 @@ export function PublicContactPage() {
           }}
         >
           <Stack spacing={2}>
-            <TextField label="Nome" fullWidth />
-            <TextField label="E-mail" type="email" fullWidth />
-            <TextField label="Assunto" fullWidth />
-            <TextField label="Mensagem" multiline minRows={5} fullWidth />
+            <TextField
+              label="Nome"
+              fullWidth
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+            />
 
-            <Button type="submit" variant="contained">
+            <TextField
+              label="E-mail"
+              type="email"
+              fullWidth
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+            />
+
+            <TextField
+              label="Assunto"
+              fullWidth
+              value={form.subject}
+              onChange={(e) => setForm((prev) => ({ ...prev, subject: e.target.value }))}
+            />
+
+            <TextField
+              label="Mensagem"
+              multiline
+              minRows={5}
+              fullWidth
+              value={form.message}
+              onChange={(e) => setForm((prev) => ({ ...prev, message: e.target.value }))}
+            />
+
+            <Button type="submit" variant="contained" disabled={loading}>
               Enviar mensagem
             </Button>
           </Stack>

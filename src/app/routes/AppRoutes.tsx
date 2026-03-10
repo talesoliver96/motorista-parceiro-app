@@ -11,6 +11,7 @@ import { SettingsPage } from "../../pages/SettingsPage";
 import { ContactPage } from "../../pages/ContactPage";
 import { PublicContactPage } from "../../pages/PublicContactPage";
 import { TermsPage } from "../../pages/TermsPage";
+import { SubscriptionPage } from "../../pages/SubscriptionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { AdminDashboardPage } from "../../pages/AdminDashboardPage";
 import { AdminUsersPage } from "../../pages/AdminUsersPage";
@@ -53,6 +54,17 @@ export function AppRoutes() {
       />
 
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      <Route
+        path="/subscription"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <SubscriptionPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/dashboard"

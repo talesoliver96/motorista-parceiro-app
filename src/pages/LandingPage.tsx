@@ -9,7 +9,6 @@ import {
   AppBar,
   Toolbar,
   Link,
-  Divider,
 } from "@mui/material";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
@@ -19,8 +18,10 @@ import PedalBikeRoundedIcon from "@mui/icons-material/PedalBikeRounded";
 import QueryStatsRoundedIcon from "@mui/icons-material/QueryStatsRounded";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
 import { Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
+import { usePublicAppSettings } from "../features/app-settings/usePublicAppSettings";
 import { formatCurrency } from "../features/earnings/earnings.utils";
 
 function SectionCard(props: {
@@ -31,7 +32,7 @@ function SectionCard(props: {
   return (
     <Box
       sx={{
-        p: 3.5,
+        p: 4,
         borderRadius: 5,
         border: "1px solid",
         borderColor: "divider",
@@ -52,6 +53,7 @@ function SectionCard(props: {
 
 export function LandingPage() {
   const { user } = useAuth();
+  const { settings } = usePublicAppSettings();
 
   return (
     <Box sx={{ bgcolor: "background.default" }}>
@@ -76,8 +78,14 @@ export function LandingPage() {
               </Link>
 
               <Link component={RouterLink} to="/terms" underline="hover">
-                Regras
+                Contrato e regras
               </Link>
+
+              {settings.subscriptionMode.enabled ? (
+                <Link component={RouterLink} to="/subscription" underline="hover">
+                  Assinatura
+                </Link>
+              ) : null}
 
               {user ? (
                 <Button component={RouterLink} to="/dashboard" variant="contained">
@@ -99,7 +107,7 @@ export function LandingPage() {
         </Container>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 6, md: 10 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 7, md: 11 } }}>
         <Grid container spacing={5} alignItems="center">
           <Grid size={{ xs: 12, lg: 6 }}>
             <Stack spacing={3}>
@@ -114,8 +122,8 @@ export function LandingPage() {
               <Typography
                 variant="h1"
                 sx={{
-                  fontSize: { xs: "2.7rem", md: "4rem" },
-                  lineHeight: 1.05,
+                  fontSize: { xs: "2.8rem", md: "4.2rem" },
+                  lineHeight: 1.03,
                   fontWeight: 900,
                 }}
               >
@@ -124,14 +132,14 @@ export function LandingPage() {
 
               <Typography
                 sx={{
-                  fontSize: { xs: "1.05rem", md: "1.2rem" },
+                  fontSize: { xs: "1.05rem", md: "1.18rem" },
                   color: "text.secondary",
                   maxWidth: 640,
                 }}
               >
                 Feito para motorista de app, entregador de moto e ciclista.
-                Acompanhe quanto entra, quanto sai e quanto realmente sobra,
-                sem planilhas complicadas e sem depender de anotações soltas.
+                Veja quanto entra, quanto sai e quanto realmente sobra,
+                de forma clara, prática e profissional.
               </Typography>
 
               <Stack direction="row" spacing={1.5} flexWrap="wrap">
@@ -152,6 +160,19 @@ export function LandingPage() {
                     size="large"
                   >
                     Já tenho conta
+                  </Button>
+                ) : null}
+
+                {settings.subscriptionMode.enabled ? (
+                  <Button
+                    component={RouterLink}
+                    to="/subscription"
+                    variant="outlined"
+                    color="success"
+                    size="large"
+                    startIcon={<WorkspacePremiumRoundedIcon />}
+                  >
+                    Ver Premium
                   </Button>
                 ) : null}
               </Stack>
@@ -186,14 +207,7 @@ export function LandingPage() {
 
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <Box
-                      sx={{
-                        p: 2.5,
-                        borderRadius: 4,
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
+                    <Box sx={{ p: 2.5, borderRadius: 4, border: "1px solid", borderColor: "divider" }}>
                       <Typography variant="body2" color="text.secondary">
                         Ganho bruto
                       </Typography>
@@ -204,14 +218,7 @@ export function LandingPage() {
                   </Grid>
 
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <Box
-                      sx={{
-                        p: 2.5,
-                        borderRadius: 4,
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
+                    <Box sx={{ p: 2.5, borderRadius: 4, border: "1px solid", borderColor: "divider" }}>
                       <Typography variant="body2" color="text.secondary">
                         Lucro líquido
                       </Typography>
@@ -222,14 +229,7 @@ export function LandingPage() {
                   </Grid>
 
                   <Grid size={{ xs: 12 }}>
-                    <Box
-                      sx={{
-                        p: 2.5,
-                        borderRadius: 4,
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
+                    <Box sx={{ p: 2.5, borderRadius: 4, border: "1px solid", borderColor: "divider" }}>
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Ganhos por dia
                       </Typography>
@@ -257,13 +257,13 @@ export function LandingPage() {
         </Grid>
       </Container>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 8 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 6, md: 9 } }}>
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 4 }}>
             <SectionCard
               icon={<SavingsRoundedIcon />}
               title="Saiba quanto realmente sobra"
-              description="Veja seu valor bruto, seus gastos e o lucro líquido em um painel simples, sem precisar montar conta na mão."
+              description="Veja seu bruto, seus gastos e o lucro líquido em um painel simples, sem fazer conta manual."
             />
           </Grid>
 
@@ -271,127 +271,109 @@ export function LandingPage() {
             <SectionCard
               icon={<QueryStatsRoundedIcon />}
               title="Acompanhe sua evolução"
-              description="Compare períodos, descubra seus dias mais fortes e entenda se você está melhorando mês a mês."
+              description="Compare períodos, descubra seus melhores dias e entenda se está valendo a pena continuar da mesma forma."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
             <SectionCard
               icon={<ReceiptLongRoundedIcon />}
-              title="Controle gastos do dia a dia"
-              description="Anote comida, contas, parcela, locação e outros custos para saber o resultado real do seu trabalho."
+              title="Controle seus custos do dia a dia"
+              description="Anote comida, conta, parcela, locação e outros gastos para enxergar o seu resultado real."
             />
           </Grid>
         </Grid>
       </Container>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 8 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 6, md: 9 } }}>
         <Grid container spacing={4}>
           <Grid size={{ xs: 12, md: 6 }}>
             <Stack spacing={2}>
               <Typography variant="h3" fontWeight={800}>
-                Gratuito para começar e fácil de entender.
-              </Typography>
-              <Typography color="text.secondary">
-                Você pode usar gratuitamente para organizar sua rotina de trabalho,
-                acompanhar ganhos e gastos e entender melhor sua operação.
+                Feito para ser claro até para quem não gosta de planilha.
               </Typography>
               <Typography color="text.secondary">
                 O objetivo do app é simples: ajudar você a parar de trabalhar no escuro
-                e começar a enxergar números reais.
+                e começar a tomar decisões com base em números reais.
+              </Typography>
+              <Typography color="text.secondary">
+                Você registra ganhos, registra gastos e acompanha o que realmente está sobrando.
               </Typography>
             </Stack>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }}>
-            <Stack spacing={2}>
-              <SectionCard
-                icon={<SecurityRoundedIcon />}
-                title="Seus dados com mais controle"
-                description="Cada usuário tem conta própria, painel individual e permissões controladas para manter o sistema organizado."
-              />
-            </Stack>
+            <SectionCard
+              icon={<SecurityRoundedIcon />}
+              title="Mais organização e mais controle"
+              description="Cada usuário tem conta própria, painel individual e permissões controladas para manter tudo seguro e organizado."
+            />
           </Grid>
         </Grid>
       </Container>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 5, md: 8 } }}>
-        <Box
-          sx={{
-            p: { xs: 3, md: 5 },
-            borderRadius: 6,
-            bgcolor: "primary.main",
-            color: "primary.contrastText",
-          }}
-        >
-          <Grid container spacing={3} alignItems="center">
-            <Grid size={{ xs: 12, md: 8 }}>
-              <Stack spacing={1}>
-                <Typography variant="h4" fontWeight={800}>
-                  Tenha clareza do seu trabalho todos os dias.
-                </Typography>
-                <Typography sx={{ opacity: 0.92 }}>
-                  Organize ganhos, controle gastos e acompanhe seu lucro real em poucos minutos.
-                </Typography>
-              </Stack>
-            </Grid>
+      {settings.subscriptionMode.enabled ? (
+        <Container maxWidth="lg" sx={{ py: { xs: 6, md: 9 } }}>
+          <Box
+            sx={{
+              p: { xs: 3, md: 5 },
+              borderRadius: 6,
+              bgcolor: "success.main",
+              color: "white",
+            }}
+          >
+            <Grid container spacing={3} alignItems="center">
+              <Grid size={{ xs: 12, md: 8 }}>
+                <Stack spacing={1}>
+                  <Typography variant="h4" fontWeight={800}>
+                    Libere os recursos premium quando quiser
+                  </Typography>
+                  <Typography sx={{ opacity: 0.92 }}>
+                    Relatórios avançados, cálculo automático de combustível, R$/KM e R$/hora.
+                  </Typography>
+                </Stack>
+              </Grid>
 
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Stack direction={{ xs: "column", sm: "row", md: "column" }} spacing={1.5}>
+              <Grid size={{ xs: 12, md: 4 }}>
                 <Button
                   component={RouterLink}
-                  to={user ? "/dashboard" : "/cadastro"}
+                  to="/subscription"
                   variant="contained"
                   color="inherit"
-                  sx={{ color: "primary.main" }}
+                  sx={{ color: "success.main" }}
+                  fullWidth
                 >
-                  {user ? "Abrir painel" : "Criar conta grátis"}
+                  Ver planos
                 </Button>
-
-                {!user ? (
-                  <Button
-                    component={RouterLink}
-                    to="/login"
-                    variant="outlined"
-                    sx={{
-                      borderColor: "rgba(255,255,255,0.6)",
-                      color: "white",
-                    }}
-                  >
-                    Entrar
-                  </Button>
-                ) : null}
-              </Stack>
+              </Grid>
             </Grid>
-          </Grid>
-        </Box>
-      </Container>
+          </Box>
+        </Container>
+      ) : null}
 
       <Box sx={{ borderTop: "1px solid", borderColor: "divider", mt: 2 }}>
         <Container maxWidth="lg" sx={{ py: 4 }}>
-          <Stack spacing={3}>
-            <Divider />
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            justifyContent="space-between"
+            spacing={2}
+          >
+            <Typography color="text.secondary">
+              © {new Date().getFullYear()} MotoristaParceiro. Controle simples para quem trabalha com app.
+            </Typography>
 
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              justifyContent="space-between"
-              spacing={2}
-            >
-              <Typography color="text.secondary">
-                © {new Date().getFullYear()} MotoristaParceiro. Controle simples para quem trabalha com app.
-              </Typography>
-
-              <Stack direction="row" spacing={2} flexWrap="wrap">
-                <Link component={RouterLink} to="/contact-public" underline="hover">
-                  Contato
+            <Stack direction="row" spacing={2} flexWrap="wrap">
+              <Link component={RouterLink} to="/contact-public" underline="hover">
+                Contato
+              </Link>
+              <Link component={RouterLink} to="/terms" underline="hover">
+                Contrato e regras
+              </Link>
+              {settings.subscriptionMode.enabled ? (
+                <Link component={RouterLink} to="/subscription" underline="hover">
+                  Assinatura
                 </Link>
-                <Link component={RouterLink} to="/terms" underline="hover">
-                  Contrato e regras
-                </Link>
-                <Link component={RouterLink} to="/login" underline="hover">
-                  Entrar
-                </Link>
-              </Stack>
+              ) : null}
             </Stack>
           </Stack>
         </Container>

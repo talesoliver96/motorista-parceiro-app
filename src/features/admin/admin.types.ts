@@ -60,9 +60,38 @@ export type PremiumHistoryItem = {
   new_premium_until: string | null;
   details: Record<string, unknown>;
   created_at: string;
+  user_name?: string | null;
+  admin_name?: string | null;
+  user_email?: string | null;
 };
 
 export type NewUserPremiumPolicy = {
   enabled: boolean;
   durationDays: number;
+};
+
+export type SubscriptionMode = {
+  enabled: boolean;
+};
+
+export type MaintenanceMode = {
+  enabled: boolean;
+  message: string;
+};
+
+export type PremiumPricing = {
+  monthlyPrice: number;
+  quarterlyPrice: number;
+  semiannualPrice: number;
+  annualPrice: number;
+  stripePriceMonthly: string;
+  stripePriceQuarterly: string;
+  stripePriceSemiannual: string;
+  stripePriceAnnual: string;
+};
+
+export type PublicAppSettings = {
+  subscriptionMode: SubscriptionMode;
+  maintenanceMode: MaintenanceMode;
+  premiumPricing: PremiumPricing;
 };
