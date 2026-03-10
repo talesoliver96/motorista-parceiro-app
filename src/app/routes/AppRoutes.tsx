@@ -8,10 +8,11 @@ import { ExpensesPage } from "../../pages/ExpensesPage";
 import { SettingsPage } from "../../pages/SettingsPage";
 import { ContactPage } from "../../pages/ContactPage";
 import { ReportsPage } from "../../pages/ReportsPage";
+import { AdminDashboardPage } from "../../pages/AdminDashboardPage";
+import { AdminUsersPage } from "../../pages/AdminUsersPage";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicOnlyRoute } from "./PublicOnlyRoute";
-import { AdminUsersPage } from "../../pages/AdminUsersPage";
 
 export function AppRoutes() {
   return (
@@ -97,6 +98,17 @@ export function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <ReportsPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AdminDashboardPage />
             </AppLayout>
           </ProtectedRoute>
         }

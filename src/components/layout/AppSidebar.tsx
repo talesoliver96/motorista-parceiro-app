@@ -49,7 +49,7 @@ const navItems: NavItem[] = [
   },
   {
     label: "Admin",
-    path: "/admin/users",
+    path: "/admin",
     icon: <AdminPanelSettingsRoundedIcon />,
     adminOnly: true,
   },
@@ -66,7 +66,7 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
   const { profile } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
- const width = collapsed ? drawerCollapsed : drawerWidth;
+  const width = collapsed ? drawerCollapsed : drawerWidth;
 
   const visibleItems = useMemo(() => {
     return navItems.filter((item) => {
@@ -102,7 +102,9 @@ export function AppSidebar({ mobileOpen, onCloseMobile }: Props) {
 
       <List sx={{ px: 1, py: 1 }}>
         {visibleItems.map((item) => {
-          const selected = location.pathname === item.path;
+          const selected =
+            location.pathname === item.path ||
+            (item.path === "/admin" && location.pathname.startsWith("/admin"));
 
           const button = (
             <ListItemButton
