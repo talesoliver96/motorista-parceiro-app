@@ -12,18 +12,22 @@ import {
 } from "@mui/material";
 import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
 import PixRoundedIcon from "@mui/icons-material/Pix";
-import { useMemo, useState } from "react";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import { useEffect, useMemo, useState } from "react";
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { usePublicAppSettings } from "../features/app-settings/usePublicAppSettings";
 import { formatCurrency } from "../features/earnings/earnings.utils";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../app/providers/AuthProvider";
 
 type PlanCode = "monthly" | "quarterly" | "semiannual" | "annual";
 type PaymentFlow = "card_subscription" | "pix_one_time";
 
 export function SubscriptionPage() {
   const { settings } = usePublicAppSettings();
+  const { refreshProfile } = useAuth();
+
   const [loadingPlan, setLoadingPlan] = useState<PlanCode | null>(null);
   const [paymentFlow, setPaymentFlow] = useState<PaymentFlow>("card_subscription");
 
@@ -57,6 +61,31 @@ export function SubscriptionPage() {
     ],
     [settings]
   );
+
+  useEffect(() => {
+    if (!success) return;
+
+    let cancelled = false;
+
+    const syncProfile = async () => {
+      try {
+        await refreshProfile();
+
+        setTimeout(async () => {
+          if (cancelled) return;
+          await refreshProfile();
+        }, 2000);
+      } catch (error) {
+        console.error("Erro ao atualizar profile após pagamento:", error);
+      }
+    };
+
+    void syncProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [success, refreshProfile]);
 
   const handleSubscribe = async (planCode: PlanCode) => {
     try {
@@ -122,7 +151,7 @@ export function SubscriptionPage() {
           <Stack spacing={0.5}>
             <Typography variant="h4">Assinatura Premium</Typography>
             <Typography color="text.secondary">
-              Escolha pagar com cartão para renovação automática ou via PIX para pagamento avulso do período.
+              Escolha pagar com cartão para renovação automática. Para pagamentos via PIX, consulte o suporte na aba de contato.
             </Typography>
           </Stack>
 
@@ -134,11 +163,7 @@ export function SubscriptionPage() {
             </Alert>
           ) : null}
 
-          {canceled ? (
-            <Alert severity="warning">
-              Pagamento cancelado.
-            </Alert>
-          ) : null}
+          {canceled ? <Alert severity="warning">Pagamento cancelado.</Alert> : null}
 
           <Stack spacing={1}>
             <Typography variant="h6">Forma de pagamento</Typography>
@@ -158,7 +183,7 @@ export function SubscriptionPage() {
                 </Stack>
               </ToggleButton>
 
-              <ToggleButton value="pix_one_time">
+              <ToggleButton value="pix_one_time" disabled>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <PixRoundedIcon fontSize="small" />
                   <span>PIX</span>
@@ -167,10 +192,12 @@ export function SubscriptionPage() {
             </ToggleButtonGroup>
 
             <Typography variant="body2" color="text.secondary">
-              {paymentFlow === "card_subscription"
-                ? "Cartão ativa assinatura com renovação automática."
-                : "PIX ativa premium pelo período escolhido, sem renovação automática."}
+              Cartão ativa assinatura com renovação automática.
             </Typography>
+
+            <Alert severity="info" icon={<LockRoundedIcon />}>
+              PIX está preparado no sistema, mas no momento deve ser tratado via suporte na aba de contato.
+            </Alert>
           </Stack>
 
           <Grid container spacing={2}>
@@ -180,11 +207,7 @@ export function SubscriptionPage() {
                   <Stack spacing={2}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography variant="h6">{plan.title}</Typography>
-                      {paymentFlow === "pix_one_time" ? (
-                        <Chip label="PIX" color="success" size="small" />
-                      ) : (
-                        <Chip label="Cartão" color="primary" size="small" />
-                      )}
+                      <Chip label="Cartão" color="primary" size="small" />
                     </Stack>
 
                     <Typography variant="h4" fontWeight={800}>
@@ -192,9 +215,7 @@ export function SubscriptionPage() {
                     </Typography>
 
                     <Typography color="text.secondary">
-                      {paymentFlow === "card_subscription"
-                        ? "Assinatura recorrente com renovação automática."
-                        : "Pagamento único via PIX, sem renovação automática."}
+                      Assinatura recorrente com renovação automática.
                     </Typography>
 
                     <Box>
@@ -204,7 +225,7 @@ export function SubscriptionPage() {
                         onClick={() => handleSubscribe(plan.code)}
                         disabled={loadingPlan === plan.code}
                       >
-                        {paymentFlow === "card_subscription" ? "Assinar" : "Pagar com PIX"}
+                        Assinar
                       </Button>
                     </Box>
                   </Stack>

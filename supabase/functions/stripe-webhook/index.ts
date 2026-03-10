@@ -4,12 +4,6 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@16.10.0";
 import { logPremiumHistory } from "../_shared/auth.ts";
 
-function addDaysIso(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString();
-}
-
 async function updateProfilePremium(params: {
   supabaseUrl: string;
   serviceRoleKey: string;
@@ -17,19 +11,73 @@ async function updateProfilePremium(params: {
   premium: boolean;
   premiumUntil: string | null;
 }) {
-  await fetch(`${params.supabaseUrl}/rest/v1/profiles?id=eq.${params.userId}`, {
-    method: "PATCH",
+  const response = await fetch(
+    `${params.supabaseUrl}/rest/v1/profiles?id=eq.${params.userId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: params.serviceRoleKey,
+        Authorization: `Bearer ${params.serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        premium: params.premium,
+        premium_forever: false,
+        premium_until: params.premiumUntil,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Erro ao atualizar profiles: ${text}`);
+  }
+}
+
+async function upsertSubscription(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  userId: string;
+  customerId: string | null;
+  subscriptionId: string;
+  planCode: string;
+  status: string;
+  expiresAt: string | null;
+  isAutoRenew: boolean;
+}) {
+  const response = await fetch(`${params.supabaseUrl}/rest/v1/user_subscriptions`, {
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
       apikey: params.serviceRoleKey,
       Authorization: `Bearer ${params.serviceRoleKey}`,
+      Prefer: "resolution=merge-duplicates",
     },
     body: JSON.stringify({
-      premium: params.premium,
-      premium_forever: false,
-      premium_until: params.premiumUntil,
+      user_id: params.userId,
+      provider: "stripe",
+      provider_customer_id: params.customerId,
+      provider_subscription_id: params.subscriptionId,
+      plan_code: params.planCode,
+      status: params.status,
+      currency: "BRL",
+      started_at: new Date().toISOString(),
+      expires_at: params.expiresAt,
+      is_auto_renew: params.isAutoRenew,
+      updated_at: new Date().toISOString(),
     }),
   });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Erro ao salvar user_subscriptions: ${text}`);
+  }
+}
+
+function addDaysIso(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
 }
 
 serve(async (req) => {
@@ -60,6 +108,9 @@ serve(async (req) => {
       stripeWebhookSecret
     );
 
+    // =========================================
+    // PIX (pagamento único)
+    // =========================================
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       const paymentFlow = session.metadata?.payment_flow;
@@ -96,6 +147,7 @@ serve(async (req) => {
             currency: (session.currency || "brl").toUpperCase(),
             started_at: new Date().toISOString(),
             expires_at: premiumUntil,
+            is_auto_renew: false,
             updated_at: new Date().toISOString(),
           }),
         });
@@ -117,17 +169,20 @@ serve(async (req) => {
           },
         });
       }
-    }
 
-    if (
-      event.type === "customer.subscription.created" ||
-      event.type === "customer.subscription.updated"
-    ) {
-      const subscription = event.data.object as Stripe.Subscription;
-      const userId = subscription.metadata?.user_id;
-      const planCode = subscription.metadata?.plan_code ?? "monthly";
+      // =========================================
+      // CARTÃO - usando checkout.session.completed
+      // como gatilho principal e buscando a subscription
+      // completa na Stripe
+      // =========================================
+      if (paymentFlow === "card_subscription" && userId && session.subscription) {
+        const subscriptionId =
+          typeof session.subscription === "string"
+            ? session.subscription
+            : session.subscription.id;
 
-      if (userId) {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
         const premiumUntil = subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000).toISOString()
           : null;
@@ -140,27 +195,19 @@ serve(async (req) => {
           premiumUntil,
         });
 
-        await fetch(`${supabaseUrl}/rest/v1/user_subscriptions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: serviceRoleKey,
-            Authorization: `Bearer ${serviceRoleKey}`,
-            Prefer: "resolution=merge-duplicates",
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            provider: "stripe",
-            provider_customer_id: subscription.customer ?? null,
-            provider_subscription_id: subscription.id,
-            plan_code: planCode,
-            status: subscription.status,
-            amount: null,
-            currency: "BRL",
-            started_at: new Date().toISOString(),
-            expires_at: premiumUntil,
-            updated_at: new Date().toISOString(),
-          }),
+        await upsertSubscription({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          customerId:
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer?.id ?? null,
+          subscriptionId: subscription.id,
+          planCode,
+          status: subscription.status,
+          expiresAt: premiumUntil,
+          isAutoRenew: true,
         });
 
         await logPremiumHistory({
@@ -182,6 +229,71 @@ serve(async (req) => {
       }
     }
 
+    // =========================================
+    // CARTÃO - reforço em updates da assinatura
+    // =========================================
+    if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated"
+    ) {
+      const rawSubscription = event.data.object as Stripe.Subscription;
+
+      const subscription = await stripe.subscriptions.retrieve(rawSubscription.id);
+
+      const userId = subscription.metadata?.user_id;
+      const planCode = subscription.metadata?.plan_code ?? "monthly";
+
+      if (userId) {
+        const premiumUntil = subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null;
+
+        await updateProfilePremium({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          premium: true,
+          premiumUntil,
+        });
+
+        await upsertSubscription({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          customerId:
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer?.id ?? null,
+          subscriptionId: subscription.id,
+          planCode,
+          status: subscription.status,
+          expiresAt: premiumUntil,
+          isAutoRenew: true,
+        });
+
+        await logPremiumHistory({
+          supabaseUrl,
+          serviceRoleKey,
+          userId,
+          adminUserId: null,
+          action: "subscription_updated",
+          oldPremium: true,
+          newPremium: true,
+          oldPremiumUntil: null,
+          newPremiumUntil: premiumUntil,
+          details: {
+            provider: "stripe",
+            flow: "card_subscription",
+            planCode,
+            status: subscription.status,
+          },
+        });
+      }
+    }
+
+    // =========================================
+    // CANCELAMENTO DE ASSINATURA
+    // =========================================
     if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object as Stripe.Subscription;
       const subscriptionId = subscription.id;

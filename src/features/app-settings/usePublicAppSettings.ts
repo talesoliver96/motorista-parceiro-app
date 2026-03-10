@@ -8,6 +8,9 @@ const defaultSettings: PublicAppSettings = {
     enabled: false,
     message: "Estamos em manutenção no momento. Tente novamente em instantes.",
   },
+  paymentMethods: {
+    pixEnabled: false,
+  },
   premiumPricing: {
     monthlyPrice: 5,
     quarterlyPrice: 12,

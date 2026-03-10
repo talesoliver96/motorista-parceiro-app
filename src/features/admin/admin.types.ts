@@ -79,6 +79,10 @@ export type MaintenanceMode = {
   message: string;
 };
 
+export type PaymentMethodsSettings = {
+  pixEnabled: boolean;
+};
+
 export type PremiumPricing = {
   monthlyPrice: number;
   quarterlyPrice: number;
@@ -93,5 +97,24 @@ export type PremiumPricing = {
 export type PublicAppSettings = {
   subscriptionMode: SubscriptionMode;
   maintenanceMode: MaintenanceMode;
+  paymentMethods: PaymentMethodsSettings;
   premiumPricing: PremiumPricing;
+};
+
+export type UserSubscription = {
+  id: string;
+  user_id: string;
+  provider: string;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  plan_code: string;
+  status: string;
+  amount: number | null;
+  currency: string;
+  started_at: string | null;
+  expires_at: string | null;
+  canceled_at: string | null;
+  is_auto_renew: boolean;
+  created_at: string;
+  updated_at: string;
 };

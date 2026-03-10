@@ -32,15 +32,12 @@ serve(async (req) => {
       return jsonResponse({ error: "Configuração ausente" }, 500);
     }
 
-    const response = await fetch(
-      `${supabaseUrl}/rest/v1/app_settings?select=*`,
-      {
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      }
-    );
+    const response = await fetch(`${supabaseUrl}/rest/v1/app_settings?select=*`, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+    });
 
     if (!response.ok) {
       const text = await response.text();
@@ -59,6 +56,9 @@ serve(async (req) => {
         message:
           map.get("maintenance_mode")?.message ||
           "Estamos em manutenção no momento. Tente novamente em instantes.",
+      },
+      paymentMethods: {
+        pixEnabled: Boolean(map.get("payment_methods")?.pix_enabled),
       },
       premiumPricing: {
         monthlyPrice: Number(map.get("premium_pricing")?.monthly_price ?? 5),

@@ -19,6 +19,10 @@ import { useSnackbar } from "notistack";
 import { useEffect, useState } from "react";
 import { isPremiumProfile } from "../features/premium/premium.utils";
 
+import { subscriptionService } from "../features/subscription/subscription.service";
+import type { UserSubscription } from "../features/admin/admin.types";
+import { formatDate } from "../features/earnings/earnings.utils";
+
 const settingsSchema = z
   .object({
     phone: z.string().min(8, "Digite um telefone válido"),
@@ -69,6 +73,8 @@ const settingsSchema = z
     }
   });
 
+  
+
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export function SettingsPage() {
@@ -77,6 +83,27 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const isPremium = isPremiumProfile(profile);
+
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
+
+useEffect(() => {
+  void refreshProfile();
+}, [refreshProfile]);
+
+useEffect(() => {
+  const loadSubscription = async () => {
+    if (!user) return;
+
+    try {
+      const data = await subscriptionService.getCurrentUserSubscription(user.id);
+      setSubscription(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  void loadSubscription();
+}, [user]);
 
   const {
     register,
@@ -102,7 +129,8 @@ export function SettingsPage() {
       newPassword: "",
       confirmNewPassword: "",
     });
-  }, [profile, user, reset]);
+    void refreshProfile();
+  }, [profile, user, reset, refreshProfile]);
 
   const onSubmit = async (values: SettingsFormData) => {
     if (!user) return;
@@ -171,13 +199,20 @@ export function SettingsPage() {
             justifyContent="space-between"
             alignItems="center"
           >
-            <Typography variant="h6">Plano atual</Typography>
-            <Chip
-              label={isPremium ? "Premium" : "Free"}
-              color={isPremium ? "success" : "default"}
-              variant={isPremium ? "filled" : "outlined"}
-            />
+       <Typography variant="h6">Plano atual</Typography>
+      <Typography color="text.secondary">
+        {profile?.premium
+          ? `Premium ${subscription?.expires_at ? `até ${formatDate(subscription.expires_at)}` : ""}`
+          : "Free"}
+      </Typography>
+
+      <Chip label={profile?.premium ? "Premium" : "Free"} color={profile?.premium ? "success" : "default"} />
+
           </Stack>
+
+
+
+          
         </AppCard>
 
         <AppCard>
