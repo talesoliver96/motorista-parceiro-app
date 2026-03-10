@@ -270,6 +270,13 @@ export function AdminDashboardPage() {
             >
               Gerenciar usuários
             </Button>
+                                <Button
+component={RouterLink}
+to="/admin/system"
+variant="contained"
+>
+Configurações do sistema
+</Button>
           </Stack>
         </Stack>
 
@@ -407,14 +414,6 @@ export function AdminDashboardPage() {
                     >
                       Remover todos usuários não-admin
                     </Button>
-
-                    <Button
-component={RouterLink}
-to="/admin/system"
-variant="contained"
->
-Configurações do sistema
-</Button>
 
                     <Typography variant="body2" color="text.secondary">
                       Política atual: novos usuários entram{" "}
