@@ -8,6 +8,32 @@ import type {
   PremiumHistoryItem,
 } from "./admin.types";
 
+export const adminSettingsService = {
+  async getSetting(key: string) {
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("*")
+      .eq("key", key)
+      .single();
+
+    if (error) throw error;
+
+    return data?.value;
+  },
+
+  async updateSetting(key: string, value: unknown) {
+    const { error } = await supabase
+      .from("app_settings")
+      .update({
+        value,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("key", key);
+
+    if (error) throw error;
+  },
+};
+
 async function getAccessToken() {
   const {
     data: { session },
@@ -91,18 +117,6 @@ export const adminProService = {
 
     return (data ?? []) as AdminActionLogItem[];
   },
-
-  // async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
-  //   const { data, error } = await supabase
-  //     .from("premium_history")
-  //     .select("*")
-  //     .order("created_at", { ascending: false })
-  //     .limit(50);
-
-  //   if (error) throw error;
-
-  //   return (data ?? []) as PremiumHistoryItem[];
-  // },
 
     async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
     const { data, error } = await supabase

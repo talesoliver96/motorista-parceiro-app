@@ -18,6 +18,7 @@ import { AdminUsersPage } from "../../pages/AdminUsersPage";
 import { AppLayout } from "../../components/layout/AppLayout";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { PublicOnlyRoute } from "./PublicOnlyRoute";
+import { AdminSystemSettingsPage } from "../../pages/AdminSystemSettingsPage";
 
 export function AppRoutes() {
   return (
@@ -149,6 +150,17 @@ export function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <AdminUsersPage />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/system"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <AdminSystemSettingsPage />
             </AppLayout>
           </ProtectedRoute>
         }

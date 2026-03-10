@@ -31,6 +31,7 @@ import { AdminActionLogsCard } from "../features/admin/components/AdminActionLog
 import { PremiumHistoryCard } from "../features/admin/components/PremiumHistoryCard";
 import { useSnackbar } from "notistack";
 import { formatCurrency } from "../features/earnings/earnings.utils";
+import { Link as RouterLink } from "react-router-dom";
 
 const emptyMetrics: AdminMetrics = {
   totalUsers: 0,
@@ -406,6 +407,14 @@ export function AdminDashboardPage() {
                     >
                       Remover todos usuários não-admin
                     </Button>
+
+                    <Button
+component={RouterLink}
+to="/admin/system"
+variant="contained"
+>
+Configurações do sistema
+</Button>
 
                     <Typography variant="body2" color="text.secondary">
                       Política atual: novos usuários entram{" "}
