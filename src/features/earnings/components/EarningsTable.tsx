@@ -21,6 +21,7 @@ import type { Earning } from "../../../types/database";
 import {
   formatCurrency,
   formatDate,
+  getEarningPerHour,
   getEarningPerKm,
 } from "../earnings.utils";
 import { EmptyState } from "../../../components/common/EmptyState";
@@ -64,6 +65,7 @@ export function EarningsTable({
       <Stack spacing={2}>
         {items.map((item) => {
           const earningPerKm = getEarningPerKm(item);
+          const earningPerHour = getEarningPerHour(item);
 
           return (
             <AppCard key={item.id}>
@@ -125,6 +127,21 @@ export function EarningsTable({
                 </Typography>
 
                 <Typography variant="body2">
+                  R$/hora:{" "}
+                  {isPremium ? (
+                    earningPerHour ? formatCurrency(earningPerHour) : "-"
+                  ) : (
+                    <Chip
+                      size="small"
+                      icon={<LockRoundedIcon />}
+                      label="Premium"
+                      color="success"
+                      variant="outlined"
+                    />
+                  )}
+                </Typography>
+
+                <Typography variant="body2">
                   Corridas: {item.trips_count ?? "-"}
                 </Typography>
 
@@ -146,7 +163,7 @@ export function EarningsTable({
 
   return (
     <TableContainer component={Paper}>
-      <Table size="small" sx={{ minWidth: 860 }}>
+      <Table size="small" sx={{ minWidth: 960 }}>
         <TableHead>
           <TableRow>
             <TableCell>Data</TableCell>
@@ -156,6 +173,7 @@ export function EarningsTable({
             <TableCell align="right">KM</TableCell>
             <TableCell align="right">R$/KM</TableCell>
             <TableCell align="right">Horas</TableCell>
+            <TableCell align="right">R$/hora</TableCell>
             <TableCell align="right">Corridas</TableCell>
             <TableCell>Observações</TableCell>
             <TableCell align="right">Ações</TableCell>
@@ -165,6 +183,7 @@ export function EarningsTable({
         <TableBody>
           {items.map((item) => {
             const earningPerKm = getEarningPerKm(item);
+            const earningPerHour = getEarningPerHour(item);
 
             return (
               <TableRow key={item.id} hover>
@@ -191,6 +210,19 @@ export function EarningsTable({
                   )}
                 </TableCell>
                 <TableCell align="right">{item.work_hours ?? "-"}</TableCell>
+                <TableCell align="right">
+                  {isPremium ? (
+                    earningPerHour ? formatCurrency(earningPerHour) : "-"
+                  ) : (
+                    <Chip
+                      size="small"
+                      icon={<LockRoundedIcon />}
+                      label="Premium"
+                      color="success"
+                      variant="outlined"
+                    />
+                  )}
+                </TableCell>
                 <TableCell align="right">{item.trips_count ?? "-"}</TableCell>
                 <TableCell>
                   <Typography

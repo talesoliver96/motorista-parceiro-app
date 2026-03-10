@@ -46,6 +46,20 @@ export function AuthProvider({ children }: Props) {
       const nextProfile = await profileService.getProfileByUserId(nextUser.id);
 
       if (!mountedRef.current) return;
+
+      if (nextProfile?.is_blocked) {
+        try {
+          await authService.signOut();
+        } catch (error) {
+          console.error("Erro ao deslogar usuário bloqueado:", error);
+        }
+
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        return;
+      }
+
       setProfile(nextProfile);
     } catch (error) {
       console.error("Erro ao carregar profile:", error);
@@ -57,7 +71,6 @@ export function AuthProvider({ children }: Props) {
 
   const syncSession = useCallback(
     async (nextSession?: Session | null) => {
-      // Evita sync concorrente.
       if (syncInFlightRef.current) {
         await syncInFlightRef.current;
       }
@@ -118,12 +131,12 @@ export function AuthProvider({ children }: Props) {
     void syncSession();
 
     const { data } = authService.onAuthStateChange(
-  async (_event, nextSession): Promise<void> => {
-    queueMicrotask(() => {
-      void syncSession(nextSession);
-    });
-  }
-);
+      async (_event, nextSession): Promise<void> => {
+        queueMicrotask(() => {
+          void syncSession(nextSession);
+        });
+      }
+    );
 
     return () => {
       mountedRef.current = false;

@@ -88,7 +88,7 @@ export function getRecentActivity(
     amount: item.amount,
   }));
 
-  return [...earningItems, ...expenseItems]
-    .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
-    .slice(0, 6);
+  return [...earningItems, ...expenseItems].sort(
+    (a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf()
+  );
 }

@@ -26,6 +26,11 @@ export function getEarningPerKm(item: Earning) {
   return item.gross_amount / item.km_traveled;
 }
 
+export function getEarningPerHour(item: Earning) {
+  if (!item.work_hours || item.work_hours <= 0) return null;
+  return item.gross_amount / item.work_hours;
+}
+
 export function getFuelCost(item: Earning) {
   if (
     !item.km_traveled ||

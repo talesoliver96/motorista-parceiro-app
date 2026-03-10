@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { LandingPage } from "../../pages/LandingPage";
 import { LoginPage } from "../../pages/LoginPage";
 import { RegisterPage } from "../../pages/RegisterPage";
+import { ForgotPasswordPage } from "../../pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "../../pages/ResetPasswordPage";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { EarningsPage } from "../../pages/EarningsPage";
 import { ExpensesPage } from "../../pages/ExpensesPage";
@@ -36,6 +38,17 @@ export function AppRoutes() {
           </PublicOnlyRoute>
         }
       />
+
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicOnlyRoute>
+            <ForgotPasswordPage />
+          </PublicOnlyRoute>
+        }
+      />
+
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         path="/dashboard"

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Stack, Typography } from "@mui/material";
+import { Alert, Pagination, Stack, Typography } from "@mui/material";
 import { PageContainer } from "../components/common/PageContainer";
 import { useAuth } from "../app/providers/AuthProvider";
 import type { Expense, Earning } from "../types/database";
@@ -19,6 +19,11 @@ import { useSnackbar } from "notistack";
 import type { ExpenseListItem } from "../features/expenses/expenses.types";
 import { buildAutomaticFuelExpenses } from "../features/expenses/expenses.utils";
 import { isPremiumProfile } from "../features/premium/premium.utils";
+import {
+  getSmartListPageSize,
+  getTotalPages,
+  paginateArray,
+} from "../utils/pagination";
 
 export function ExpensesPage() {
   const { user, profile } = useAuth();
@@ -34,6 +39,7 @@ export function ExpensesPage() {
   const [earnings, setEarnings] = useState<Earning[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
 
   const [formOpen, setFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Expense | null>(null);
@@ -65,6 +71,7 @@ export function ExpensesPage() {
   };
 
   useEffect(() => {
+    setPage(1);
     loadData();
   }, [user, startDate, endDate]);
 
@@ -88,6 +95,21 @@ export function ExpensesPage() {
       return b.date.localeCompare(a.date);
     });
   }, [manualItems, automaticFuelItems]);
+
+  const pageSize = useMemo(
+    () => getSmartListPageSize(startDate, endDate),
+    [startDate, endDate]
+  );
+
+  const totalPages = useMemo(
+    () => getTotalPages(items.length, pageSize),
+    [items.length, pageSize]
+  );
+
+  const paginatedItems = useMemo(
+    () => paginateArray(items, page, pageSize),
+    [items, page, pageSize]
+  );
 
   const manualTotal = useMemo(
     () => manualItems.reduce((acc, item) => acc + Number(item.amount || 0), 0),
@@ -232,11 +254,22 @@ export function ExpensesPage() {
             <Typography>Carregando gastos...</Typography>
           </AppCard>
         ) : (
-          <ExpensesTable
-            items={items}
-            onEdit={handleEdit}
-            onDelete={handleDeleteRequest}
-          />
+          <>
+            <ExpensesTable
+              items={paginatedItems}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+            />
+
+            <Stack direction="row" justifyContent="flex-end">
+              <Pagination
+                page={page}
+                count={totalPages}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+              />
+            </Stack>
+          </>
         )}
       </Stack>
 

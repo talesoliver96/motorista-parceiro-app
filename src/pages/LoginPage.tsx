@@ -1,32 +1,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Alert, Button, Link, Stack, Typography } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { AppCard } from "../components/common/AppCard";
-import { PageContainer } from "../components/common/PageContainer";
-import {
-  loginSchema,
-  type LoginFormData,
-} from "../features/auth/auth.schemas";
-import { authService } from "../features/auth/auth.service";
-import { useSnackbar } from "notistack";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { AuthCard } from "../features/auth/components/AuthCard";
+import { FormTextField } from "../components/common/FormTextField";
+import { loginSchema, type LoginFormData } from "../features/auth/auth.schemas";
+import { authService } from "../features/auth/auth.service";
+import { profileService } from "../features/auth/profile.service";
+import { useSnackbar } from "notistack";
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const { enqueueSnackbar } = useSnackbar();
-  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
-    register,
+    control,
     handleSubmit,
-    formState: { errors },
+    formState: { isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -35,72 +27,87 @@ export function LoginPage() {
     },
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (values: LoginFormData) => {
     try {
-      setSubmitting(true);
+      setSubmitError(null);
 
-      await authService.signIn(data);
+      await authService.signIn(values);
+
+      const session = await authService.getSession();
+      const user = session?.user;
+
+      if (!user) {
+        throw new Error("Não foi possível autenticar este usuário.");
+      }
+
+      const profile = await profileService.getProfileByUserId(user.id);
+
+      if (profile?.is_blocked) {
+        await authService.signOut();
+        throw new Error("Não foi possível autenticar este usuário.");
+      }
 
       enqueueSnackbar("Login realizado com sucesso", {
         variant: "success",
       });
+
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("E-mail ou senha inválidos", {
-        variant: "error",
-      });
-    } finally {
-      setSubmitting(false);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "E-mail ou senha inválidos";
+
+      setSubmitError(message);
     }
   };
 
   return (
-    <PageContainer>
-      <Box
-        sx={{
-          minHeight: "80vh",
-          display: "grid",
-          placeItems: "center",
-        }}
+    <AuthCard
+      title="Entrar"
+      subtitle="Acesse sua conta para acompanhar seus ganhos e gastos."
+      footer={
+        <Typography variant="body2" color="text.secondary">
+          Ainda não tem conta?{" "}
+          <Link component={RouterLink} to="/cadastro">
+            Criar conta
+          </Link>
+        </Typography>
+      }
+    >
+      <Stack
+        component="form"
+        spacing={2}
+        onSubmit={handleSubmit(onSubmit)}
       >
-        <AppCard sx={{ width: "100%", maxWidth: 420 }}>
-          <Stack
-            component="form"
-            spacing={2}
-            onSubmit={handleSubmit(onSubmit)}
-          >
-            <Typography variant="h5">Entrar</Typography>
+        {submitError ? <Alert severity="error">{submitError}</Alert> : null}
 
-            <Typography variant="body2" color="text.secondary">
-              Faça login para acessar seus ganhos e gastos.
-            </Typography>
+        <FormTextField
+          name="email"
+          control={control}
+          label="E-mail"
+          type="email"
+        />
 
-            <TextField
-              label="E-mail"
-              type="email"
-              {...register("email")}
-              error={!!errors.email}
-              helperText={errors.email?.message}
-            />
+        <FormTextField
+          name="password"
+          control={control}
+          label="Senha"
+          type="password"
+        />
 
-            <TextField
-              label="Senha"
-              type="password"
-              {...register("password")}
-              error={!!errors.password}
-              helperText={errors.password?.message}
-            />
+        <Stack alignItems="flex-end">
+          <Link component={RouterLink} to="/forgot-password" underline="hover">
+            Esqueci minha senha
+          </Link>
+        </Stack>
 
-            <Button type="submit" variant="contained" disabled={submitting}>
-              {submitting ? <CircularProgress size={22} /> : "Entrar"}
-            </Button>
-
-            <Button component={RouterLink} to="/cadastro" variant="text">
-              Criar conta
-            </Button>
-          </Stack>
-        </AppCard>
-      </Box>
-    </PageContainer>
+        <Button type="submit" variant="contained" size="large" disabled={isSubmitting}>
+          Entrar
+        </Button>
+      </Stack>
+    </AuthCard>
   );
 }

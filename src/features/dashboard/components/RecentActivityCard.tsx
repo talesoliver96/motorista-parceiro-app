@@ -1,68 +1,96 @@
-import { Chip, Divider, Stack, Typography } from "@mui/material";
+import {
+  Chip,
+  Pagination,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { useMemo, useState } from "react";
 import { AppCard } from "../../../components/common/AppCard";
 import { formatCurrency, formatDate } from "../../earnings/earnings.utils";
+import { getTotalPages, paginateArray } from "../../../utils/pagination";
 
-type Props = {
-  items: Array<{
-    id: string;
-    type: "earning" | "expense";
-    title: string;
-    date: string;
-    amount: number;
-  }>;
+type Item = {
+  id: string;
+  type: "earning" | "expense";
+  title: string;
+  date: string;
+  amount: number;
 };
 
+type Props = {
+  items: Item[];
+};
+
+const PAGE_SIZE = 10;
+
 export function RecentActivityCard({ items }: Props) {
+  const [page, setPage] = useState(1);
+
+  const totalPages = useMemo(
+    () => getTotalPages(items.length, PAGE_SIZE),
+    [items.length]
+  );
+
+  const paginatedItems = useMemo(
+    () => paginateArray(items, page, PAGE_SIZE),
+    [items, page]
+  );
+
   return (
     <AppCard sx={{ height: "100%" }}>
-      <Typography variant="h6" gutterBottom>
-        Atividade recente
-      </Typography>
+      <Stack spacing={2}>
+        <Typography variant="h6">Atividade recente</Typography>
 
-      <Stack spacing={1.5}>
         {!items.length ? (
           <Typography variant="body2" color="text.secondary">
             Nenhuma movimentação no período.
           </Typography>
         ) : (
-          items.map((item, index) => (
-            <Stack key={item.id} spacing={1}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-                gap={1}
-              >
-                <Stack spacing={0.3}>
-                  <Typography variant="body2" fontWeight={600}>
-                    {item.title}
-                  </Typography>
+          <>
+            <Stack spacing={1.5}>
+              {paginatedItems.map((item) => (
+                <Stack key={item.id} spacing={0.4}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="body2" fontWeight={700}>
+                      {item.title}
+                    </Typography>
+
+                    <Chip
+                      size="small"
+                      label={item.type === "earning" ? "Ganho" : "Gasto"}
+                      color={item.type === "earning" ? "success" : "default"}
+                      variant="outlined"
+                    />
+                  </Stack>
+
                   <Typography variant="caption" color="text.secondary">
                     {formatDate(item.date)}
                   </Typography>
-                </Stack>
 
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Chip
-                    size="small"
-                    label={item.type === "earning" ? "Ganho" : "Gasto"}
-                    color={item.type === "earning" ? "success" : "default"}
-                    variant="outlined"
-                  />
                   <Typography
                     variant="body2"
-                    fontWeight={700}
-                    color={item.type === "earning" ? "success.main" : "text.primary"}
+                    color={item.type === "earning" ? "success.main" : "error.main"}
                   >
-                    {item.type === "earning" ? "+" : "-"}
-                    {formatCurrency(item.amount)}
+                    {item.type === "earning" ? "+" : "-"} {formatCurrency(item.amount)}
                   </Typography>
                 </Stack>
-              </Stack>
-
-              {index < items.length - 1 ? <Divider /> : null}
+              ))}
             </Stack>
-          ))
+
+            <Stack direction="row" justifyContent="flex-end">
+              <Pagination
+                page={page}
+                count={totalPages}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+                size="small"
+              />
+            </Stack>
+          </>
         )}
       </Stack>
     </AppCard>

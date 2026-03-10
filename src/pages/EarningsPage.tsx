@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Stack, Typography } from "@mui/material";
+import { Alert, Pagination, Stack, Typography } from "@mui/material";
 import { PageContainer } from "../components/common/PageContainer";
 import { useAuth } from "../app/providers/AuthProvider";
 import type { Earning } from "../types/database";
@@ -16,6 +16,11 @@ import {
 import { AppCard } from "../components/common/AppCard";
 import { useSnackbar } from "notistack";
 import { isPremiumProfile } from "../features/premium/premium.utils";
+import {
+  getSmartListPageSize,
+  getTotalPages,
+  paginateArray,
+} from "../utils/pagination";
 
 export function EarningsPage() {
   const { user, profile } = useAuth();
@@ -30,12 +35,28 @@ export function EarningsPage() {
   const [items, setItems] = useState<Earning[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [page, setPage] = useState(1);
 
   const [formOpen, setFormOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Earning | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Earning | null>(null);
+
+  const pageSize = useMemo(
+    () => getSmartListPageSize(startDate, endDate),
+    [startDate, endDate]
+  );
+
+  const totalPages = useMemo(
+    () => getTotalPages(items.length, pageSize),
+    [items.length, pageSize]
+  );
+
+  const paginatedItems = useMemo(
+    () => paginateArray(items, page, pageSize),
+    [items, page, pageSize]
+  );
 
   const loadData = async () => {
     if (!user) return;
@@ -59,6 +80,7 @@ export function EarningsPage() {
   };
 
   useEffect(() => {
+    setPage(1);
     loadData();
   }, [user, startDate, endDate]);
 
@@ -154,11 +176,11 @@ export function EarningsPage() {
 
         {isPremium ? (
           <Alert severity="success">
-            Sua conta premium libera cálculo por KM e combustível automático.
+            Sua conta premium libera cálculo por KM, por hora e combustível automático.
           </Alert>
         ) : (
           <Alert severity="info">
-            Cálculos por KM e combustível automático estão disponíveis no plano premium.
+            Cálculos por KM, por hora e combustível automático estão disponíveis no plano premium.
           </Alert>
         )}
 
@@ -193,12 +215,23 @@ export function EarningsPage() {
             <Typography>Carregando ganhos...</Typography>
           </AppCard>
         ) : (
-          <EarningsTable
-            items={items}
-            onEdit={handleEdit}
-            onDelete={handleDeleteRequest}
-            isPremium={isPremium}
-          />
+          <>
+            <EarningsTable
+              items={paginatedItems}
+              onEdit={handleEdit}
+              onDelete={handleDeleteRequest}
+              isPremium={isPremium}
+            />
+
+            <Stack direction="row" justifyContent="flex-end">
+              <Pagination
+                page={page}
+                count={totalPages}
+                onChange={(_, value) => setPage(value)}
+                color="primary"
+              />
+            </Stack>
+          </>
         )}
       </Stack>
 
