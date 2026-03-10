@@ -5,6 +5,7 @@ import type {
   AdminUserListItem,
   AdminUserUpdatePayload,
   NewUserPremiumPolicy,
+  PremiumHistoryItem,
 } from "./admin.types";
 
 async function getAccessToken() {
@@ -45,6 +46,11 @@ async function callFunction(path: string, body: unknown) {
   return data;
 }
 
+function toCsvValue(value: unknown) {
+  const stringValue = String(value ?? "");
+  return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
 export const adminProService = {
   async listUsers(search = "") {
     const data = await callFunction("admin-users-pro", {
@@ -76,7 +82,7 @@ export const adminProService = {
 
   async getActionLogs(): Promise<AdminActionLogItem[]> {
     const { data, error } = await supabase
-      .from("admin_actions")
+      .from("admin_actions_enriched")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(20);
@@ -84,6 +90,18 @@ export const adminProService = {
     if (error) throw error;
 
     return (data ?? []) as AdminActionLogItem[];
+  },
+
+  async getPremiumHistory(): Promise<PremiumHistoryItem[]> {
+    const { data, error } = await supabase
+      .from("premium_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    return (data ?? []) as PremiumHistoryItem[];
   },
 
   async getNewUserPremiumPolicy(): Promise<NewUserPremiumPolicy> {
@@ -128,5 +146,48 @@ export const adminProService = {
     return await callFunction("admin-users-pro", {
       action: "clear_all_non_admin_users",
     });
+  },
+
+  exportUsersCsv(users: AdminUserListItem[]) {
+    const header = [
+      "Nome",
+      "Email",
+      "Telefone",
+      "Premium",
+      "Premium até",
+      "Admin",
+      "Bloqueado",
+      "Criado em",
+      "Último login",
+    ];
+
+    const rows = users.map((user) => [
+      user.name,
+      user.email,
+      user.phone ?? "",
+      user.premium ? "Sim" : "Não",
+      user.premium_until ?? "",
+      user.is_admin ? "Sim" : "Não",
+      user.is_blocked ? "Sim" : "Não",
+      user.created_at ?? "",
+      user.last_sign_in_at ?? "",
+    ]);
+
+    const csv = [header, ...rows]
+      .map((row) => row.map(toCsvValue).join(","))
+      .join("\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "usuarios-motorista-parceiro.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   },
 };

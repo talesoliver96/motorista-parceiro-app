@@ -97,6 +97,9 @@ const emptyMetrics: AdminMetrics = {
   usersCreatedToday: 0,
   usersCreatedLast7Days: 0,
   usersLoggedRecently: 0,
+  monthlyPremiumPrice: 5,
+  potentialMrr: 0,
+  potentialArr: 0,
 };
 
 const PAGE_SIZE = 10;

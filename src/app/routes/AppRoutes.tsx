@@ -9,6 +9,8 @@ import { EarningsPage } from "../../pages/EarningsPage";
 import { ExpensesPage } from "../../pages/ExpensesPage";
 import { SettingsPage } from "../../pages/SettingsPage";
 import { ContactPage } from "../../pages/ContactPage";
+import { PublicContactPage } from "../../pages/PublicContactPage";
+import { TermsPage } from "../../pages/TermsPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { AdminDashboardPage } from "../../pages/AdminDashboardPage";
 import { AdminUsersPage } from "../../pages/AdminUsersPage";
@@ -20,6 +22,8 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/contact-public" element={<PublicContactPage />} />
+      <Route path="/terms" element={<TermsPage />} />
 
       <Route
         path="/login"

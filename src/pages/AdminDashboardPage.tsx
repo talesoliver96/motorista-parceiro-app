@@ -1,5 +1,15 @@
-import { Alert, Button, Grid, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Button,
+  Grid,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageContainer } from "../components/common/PageContainer";
@@ -12,11 +22,15 @@ import { isAdminProfile } from "../features/admin/admin.utils";
 import type {
   AdminActionLogItem,
   AdminMetrics,
+  AdminUserListItem,
   NewUserPremiumPolicy,
+  PremiumHistoryItem,
 } from "../features/admin/admin.types";
 import { AdminMetricsCards } from "../features/admin/components/AdminMetricsCards";
 import { AdminActionLogsCard } from "../features/admin/components/AdminActionLogsCard";
+import { PremiumHistoryCard } from "../features/admin/components/PremiumHistoryCard";
 import { useSnackbar } from "notistack";
+import { formatCurrency } from "../features/earnings/earnings.utils";
 
 const emptyMetrics: AdminMetrics = {
   totalUsers: 0,
@@ -26,6 +40,9 @@ const emptyMetrics: AdminMetrics = {
   usersCreatedToday: 0,
   usersCreatedLast7Days: 0,
   usersLoggedRecently: 0,
+  monthlyPremiumPrice: 5,
+  potentialMrr: 0,
+  potentialArr: 0,
 };
 
 const emptyPolicy: NewUserPremiumPolicy = {
@@ -51,6 +68,8 @@ export function AdminDashboardPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [metrics, setMetrics] = useState<AdminMetrics>(emptyMetrics);
   const [logs, setLogs] = useState<AdminActionLogItem[]>([]);
+  const [users, setUsers] = useState<AdminUserListItem[]>([]);
+  const [premiumHistory, setPremiumHistory] = useState<PremiumHistoryItem[]>([]);
   const [policy, setPolicy] = useState<NewUserPremiumPolicy>(emptyPolicy);
   const [massPremiumDays, setMassPremiumDays] = useState(365);
 
@@ -58,15 +77,20 @@ export function AdminDashboardPage() {
     try {
       setLoading(true);
 
-      const [nextMetrics, nextLogs, nextPolicy] = await Promise.all([
-        adminProService.getMetrics(),
-        adminProService.getActionLogs(),
-        adminProService.getNewUserPremiumPolicy(),
-      ]);
+      const [nextMetrics, nextLogs, nextPolicy, nextUsers, nextPremiumHistory] =
+        await Promise.all([
+          adminProService.getMetrics(),
+          adminProService.getActionLogs(),
+          adminProService.getNewUserPremiumPolicy(),
+          adminProService.listUsers(""),
+          adminProService.getPremiumHistory(),
+        ]);
 
       setMetrics(nextMetrics ?? emptyMetrics);
       setLogs(nextLogs);
       setPolicy(nextPolicy ?? emptyPolicy);
+      setUsers(nextUsers);
+      setPremiumHistory(nextPremiumHistory);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao carregar dashboard admin", {
@@ -217,17 +241,35 @@ export function AdminDashboardPage() {
           <Stack spacing={0.5}>
             <Typography variant="h4">Dashboard Admin</Typography>
             <Typography color="text.secondary">
-              Acompanhe métricas do sistema e gerencie usuários.
+              Acompanhe métricas do sistema, histórico premium e ações administrativas.
             </Typography>
           </Stack>
 
-          <Button
-            variant="contained"
-            startIcon={<PeopleRoundedIcon />}
-            onClick={() => navigate("/admin/users")}
-          >
-            Gerenciar usuários
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={() => loadData()}
+            >
+              Atualizar
+            </Button>
+
+            <Button
+              variant="outlined"
+              startIcon={<DownloadRoundedIcon />}
+              onClick={() => adminProService.exportUsersCsv(users)}
+            >
+              Exportar CSV
+            </Button>
+
+            <Button
+              variant="contained"
+              startIcon={<PeopleRoundedIcon />}
+              onClick={() => navigate("/admin/users")}
+            >
+              Gerenciar usuários
+            </Button>
+          </Stack>
         </Stack>
 
         <Alert severity="warning">
@@ -241,121 +283,129 @@ export function AdminDashboardPage() {
             <AdminMetricsCards metrics={metrics} />
 
             <Grid container spacing={2}>
-              <Grid size={{ xs: 12, lg: 8 }}>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppCard>
+                  <Typography variant="h6" gutterBottom>
+                    Métricas financeiras do SaaS
+                  </Typography>
+
+                  <Stack spacing={1}>
+                    <Typography variant="body2" color="text.secondary">
+                      Preço premium mensal: {formatCurrency(metrics.monthlyPremiumPrice)}
+                    </Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                      MRR potencial: {formatCurrency(metrics.potentialMrr)}
+                    </Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                      ARR potencial: {formatCurrency(metrics.potentialArr)}
+                    </Typography>
+                  </Stack>
+                </AppCard>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
                 <AppCard>
                   <Stack spacing={2}>
                     <Typography variant="h6">
-                      Ações globais do sistema
+                      Política e ações globais
                     </Typography>
 
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label="Novos usuários premium por"
-                          value={policy.durationDays}
-                          onChange={(e) =>
-                            handleSetNewUserDuration(Number(e.target.value))
-                          }
-                          disabled={actionLoading}
-                        >
-                          {premiumDurationOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Novos usuários premium por"
+                      value={policy.durationDays}
+                      onChange={(e) =>
+                        handleSetNewUserDuration(Number(e.target.value))
+                      }
+                      disabled={actionLoading}
+                    >
+                      {premiumDurationOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                          <Button
-                            fullWidth
-                            variant="contained"
-                            disabled={actionLoading}
-                            onClick={() => handleSetNewUserPremiumPolicy(true)}
-                          >
-                            Ativar premium p/ novos
-                          </Button>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        disabled={actionLoading}
+                        onClick={() => handleSetNewUserPremiumPolicy(true)}
+                      >
+                        Ativar premium p/ novos
+                      </Button>
 
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="warning"
-                            disabled={actionLoading}
-                            onClick={() => handleSetNewUserPremiumPolicy(false)}
-                          >
-                            Revogar premium p/ novos
-                          </Button>
-                        </Stack>
-                      </Grid>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="warning"
+                        disabled={actionLoading}
+                        onClick={() => handleSetNewUserPremiumPolicy(false)}
+                      >
+                        Revogar premium p/ novos
+                      </Button>
+                    </Stack>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <TextField
-                          select
-                          fullWidth
-                          label="Aplicar premium para todos os atuais"
-                          value={massPremiumDays}
-                          onChange={(e) => setMassPremiumDays(Number(e.target.value))}
-                          disabled={actionLoading}
-                        >
-                          {premiumDurationOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Aplicar premium para atuais"
+                      value={massPremiumDays}
+                      onChange={(e) => setMassPremiumDays(Number(e.target.value))}
+                      disabled={actionLoading}
+                    >
+                      {premiumDurationOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                          <Button
-                            fullWidth
-                            variant="contained"
-                            color="success"
-                            disabled={actionLoading}
-                            onClick={handleApplyPremiumToAll}
-                          >
-                            Dar premium para atuais
-                          </Button>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        color="success"
+                        disabled={actionLoading}
+                        onClick={handleApplyPremiumToAll}
+                      >
+                        Dar premium para atuais
+                      </Button>
 
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="warning"
-                            disabled={actionLoading}
-                            onClick={handleRevokePremiumFromAll}
-                          >
-                            Tirar premium de atuais
-                          </Button>
-                        </Stack>
-                      </Grid>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="warning"
+                        disabled={actionLoading}
+                        onClick={handleRevokePremiumFromAll}
+                      >
+                        Tirar premium de atuais
+                      </Button>
+                    </Stack>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          color="error"
-                          disabled={actionLoading}
-                          onClick={handleResetSystemData}
-                        >
-                          Resetar ganhos, gastos, contatos e logs
-                        </Button>
-                      </Grid>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      color="error"
+                      disabled={actionLoading}
+                      onClick={handleResetSystemData}
+                    >
+                      Resetar ganhos, gastos, contatos e logs
+                    </Button>
 
-                      <Grid size={{ xs: 12, md: 6 }}>
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          color="error"
-                          disabled={actionLoading}
-                          onClick={handleClearAllNonAdminUsers}
-                        >
-                          Remover todos usuários não-admin
-                        </Button>
-                      </Grid>
-                    </Grid>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="error"
+                      disabled={actionLoading}
+                      onClick={handleClearAllNonAdminUsers}
+                    >
+                      Remover todos usuários não-admin
+                    </Button>
 
                     <Typography variant="body2" color="text.secondary">
                       Política atual: novos usuários entram{" "}
@@ -368,6 +418,10 @@ export function AdminDashboardPage() {
 
               <Grid size={{ xs: 12, lg: 4 }}>
                 <AdminActionLogsCard items={logs} />
+              </Grid>
+
+              <Grid size={{ xs: 12, lg: 8 }}>
+                <PremiumHistoryCard items={premiumHistory} />
               </Grid>
             </Grid>
           </>

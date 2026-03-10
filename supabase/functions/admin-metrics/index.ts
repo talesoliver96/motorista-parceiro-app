@@ -40,40 +40,35 @@ serve(async (req) => {
       );
     }
 
-    const usersResponse = await fetch(
-      `${supabaseUrl}/auth/v1/admin/users?page=1&per_page=500`,
-      {
+    const [usersResponse, profilesResponse, pricingResponse] = await Promise.all([
+      fetch(`${supabaseUrl}/auth/v1/admin/users?page=1&per_page=500`, {
         headers: {
           apikey: serviceRoleKey,
           Authorization: `Bearer ${serviceRoleKey}`,
         },
-      }
-    );
+      }),
+      fetch(`${supabaseUrl}/rest/v1/profiles?select=*`, {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }),
+      fetch(`${supabaseUrl}/rest/v1/app_settings?key=eq.premium_pricing&select=*`, {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }),
+    ]);
 
-    if (!usersResponse.ok) {
-      const errorText = await usersResponse.text();
-      return jsonResponse(corsHeaders, { error: errorText }, 500);
+    if (!usersResponse.ok || !profilesResponse.ok || !pricingResponse.ok) {
+      return jsonResponse(corsHeaders, { error: "Erro ao carregar métricas" }, 500);
     }
 
     const usersData = await usersResponse.json();
     const users = usersData?.users ?? [];
-
-    const profilesResponse = await fetch(
-      `${supabaseUrl}/rest/v1/profiles?select=*`,
-      {
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      }
-    );
-
-    if (!profilesResponse.ok) {
-      const errorText = await profilesResponse.text();
-      return jsonResponse(corsHeaders, { error: errorText }, 500);
-    }
-
     const profiles = await profilesResponse.json();
+    const pricingData = await pricingResponse.json();
 
     const now = new Date();
     const todayStart = new Date(now);
@@ -85,9 +80,15 @@ serve(async (req) => {
     const recentLoginThreshold = new Date(now);
     recentLoginThreshold.setDate(recentLoginThreshold.getDate() - 7);
 
+    const monthlyPremiumPrice = Number(
+      pricingData?.[0]?.value?.monthly_price ?? 5
+    );
+
+    const premiumUsers = profiles.filter((item: any) => item.premium === true).length;
+
     const metrics = {
       totalUsers: users.length,
-      premiumUsers: profiles.filter((item: any) => item.premium === true).length,
+      premiumUsers,
       adminUsers: profiles.filter((item: any) => item.is_admin === true).length,
       blockedUsers: profiles.filter((item: any) => item.is_blocked === true).length,
       usersCreatedToday: users.filter((item: any) => {
@@ -102,6 +103,9 @@ serve(async (req) => {
         if (!item.last_sign_in_at) return false;
         return new Date(item.last_sign_in_at) >= recentLoginThreshold;
       }).length,
+      monthlyPremiumPrice,
+      potentialMrr: premiumUsers * monthlyPremiumPrice,
+      potentialArr: premiumUsers * monthlyPremiumPrice * 12,
     };
 
     return jsonResponse(corsHeaders, { metrics });

@@ -25,17 +25,44 @@ function addDays(date, days) {
   return next;
 }
 
+function getMonthKey(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+async function insertInChunks(table, items, chunkSize = 100) {
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+
+    const { error } = await supabase.from(table).insert(chunk);
+
+    if (error) {
+      console.error(`Erro ao inserir em ${table}:`, error);
+      process.exit(1);
+    }
+  }
+}
+
 async function run() {
   const today = new Date();
   const start = new Date(today);
   start.setMonth(start.getMonth() - 6);
 
   const earnings = [];
+  const expenses = [];
+
+  const createdMonthlyEntries = new Set();
+
   let cursor = new Date(start);
 
   while (cursor <= today) {
     const date = formatDate(cursor);
+    const monthKey = getMonthKey(cursor);
 
+    // =========================
+    // GANHO DIÁRIO
+    // =========================
     earnings.push({
       user_id: TARGET_USER_ID,
       date,
@@ -50,25 +77,62 @@ async function run() {
       notes: "Mock seed de 6 meses",
     });
 
+    // =========================
+    // GASTO DIÁRIO - COMIDA
+    // =========================
+    expenses.push({
+      user_id: TARGET_USER_ID,
+      date,
+      category: "Comida",
+      amount: 20,
+      notes: "Mock seed diário",
+    });
+
+    // =========================
+    // GASTOS MENSAIS
+    // cria apenas 1 vez por mês
+    // =========================
+    if (!createdMonthlyEntries.has(monthKey)) {
+      createdMonthlyEntries.add(monthKey);
+
+      const billingDate = new Date(cursor);
+      billingDate.setDate(5);
+      const billingDateString = formatDate(billingDate);
+
+      expenses.push({
+        user_id: TARGET_USER_ID,
+        date: billingDateString,
+        category: "Locação/Parcela",
+        amount: 1700,
+        notes: "Mock seed mensal",
+      });
+
+      expenses.push({
+        user_id: TARGET_USER_ID,
+        date: billingDateString,
+        category: "Conta de luz",
+        amount: 110,
+        notes: "Mock seed mensal",
+      });
+
+      expenses.push({
+        user_id: TARGET_USER_ID,
+        date: billingDateString,
+        category: "Conta de celular",
+        amount: 50,
+        notes: "Mock seed mensal",
+      });
+    }
+
     cursor = addDays(cursor, 1);
   }
 
   console.log(`Inserindo ${earnings.length} ganhos...`);
+  await insertInChunks("earnings", earnings);
 
-  const chunkSize = 100;
-
-  for (let i = 0; i < earnings.length; i += chunkSize) {
-    const chunk = earnings.slice(i, i + chunkSize);
-
-    const { error } = await supabase.from("earnings").insert(chunk);
-
-    if (error) {
-      console.error("Erro ao inserir chunk:", error);
-      process.exit(1);
-    }
-  }
+  console.log(`Inserindo ${expenses.length} gastos...`);
+  await insertInChunks("expenses", expenses);
 
   console.log("Seed concluído com sucesso.");
 }
-
 run();

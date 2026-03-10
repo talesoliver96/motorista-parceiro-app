@@ -33,6 +33,9 @@ export type AdminMetrics = {
   usersCreatedToday: number;
   usersCreatedLast7Days: number;
   usersLoggedRecently: number;
+  monthlyPremiumPrice: number;
+  potentialMrr: number;
+  potentialArr: number;
 };
 
 export type AdminActionLogItem = {
@@ -40,6 +43,21 @@ export type AdminActionLogItem = {
   admin_user_id: string;
   target_user_id: string | null;
   action: string;
+  details: Record<string, unknown>;
+  created_at: string;
+  admin_name?: string | null;
+  target_name?: string | null;
+};
+
+export type PremiumHistoryItem = {
+  id: string;
+  user_id: string;
+  admin_user_id: string | null;
+  action: string;
+  old_premium: boolean | null;
+  new_premium: boolean | null;
+  old_premium_until: string | null;
+  new_premium_until: string | null;
   details: Record<string, unknown>;
   created_at: string;
 };

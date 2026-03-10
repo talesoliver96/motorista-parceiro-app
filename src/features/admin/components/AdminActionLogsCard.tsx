@@ -13,6 +13,16 @@ function getActionLabel(action: string) {
       return "Atualizou usuário";
     case "delete_user":
       return "Excluiu usuário";
+    case "apply_premium_to_all":
+      return "Aplicou premium em massa";
+    case "revoke_premium_from_all":
+      return "Revogou premium em massa";
+    case "set_new_user_premium_policy":
+      return "Alterou política de novos usuários";
+    case "reset_system_data":
+      return "Resetou dados do sistema";
+    case "clear_all_non_admin_users":
+      return "Removeu todos os usuários não-admin";
     default:
       return action;
   }
@@ -39,11 +49,11 @@ export function AdminActionLogsCard({ items }: Props) {
                 </Typography>
 
                 <Typography variant="caption" color="text.secondary">
-                  Admin ID: {item.admin_user_id}
+                  Admin: {item.admin_name || item.admin_user_id}
                 </Typography>
 
                 <Typography variant="caption" color="text.secondary">
-                  Alvo ID: {item.target_user_id || "-"}
+                  Alvo: {item.target_name || item.target_user_id || "-"}
                 </Typography>
 
                 <Typography variant="caption" color="text.secondary">
