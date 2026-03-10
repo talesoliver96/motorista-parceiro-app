@@ -1,75 +1,84 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Grid, Stack, Typography } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Alert, Button, Grid, Stack, Typography } from "@mui/material";
+import dayjs from "dayjs";
+import { useNavigate } from "react-router-dom";
 import { PageContainer } from "../components/common/PageContainer";
-import { AppCard } from "../components/common/AppCard";
-import { DashboardFilters } from "../features/dashboard/components/DashboardFilters";
-import { RecentActivityCard } from "../features/dashboard/components/RecentActivityCard";
-import { AppSkeleton } from "../components/common/AppSkeleton";
 import { useAuth } from "../app/providers/AuthProvider";
+import {
+  dashboardService,
+  type DashboardData,
+} from "../features/dashboard/dashboard.service";
+import { DashboardFilters } from "../features/dashboard/components/DashboardFilters";
+import { DashboardMetricsCards } from "../features/dashboard/components/DashboardMetricsCards";
+import { EarningsByDayChart } from "../features/dashboard/components/EarningsByDayChart";
+import { RecentActivityCard } from "../features/dashboard/components/RecentActivityCard";
+import { AppCard } from "../components/common/AppCard";
+import { formatCurrency } from "../features/earnings/earnings.utils";
 import { useSnackbar } from "notistack";
-import {
-  getCurrentMonthRange,
-  formatCurrency,
-} from "../features/earnings/earnings.utils";
-import {
-  secureDashboardService,
-  type SecureDashboardSummary,
-} from "../features/dashboard/secure-dashboard.service";
-import { usePublicAppSettings } from "../features/app-settings/usePublicAppSettings";
+import { AppSkeleton } from "../components/common/AppSkeleton";
+import { isPremiumProfile } from "../features/premium/premium.utils";
 
-const emptySummary: SecureDashboardSummary = {
+const emptyDashboardData: DashboardData = {
+  earnings: [],
+  expenses: [],
   gross: 0,
-  manualExpenses: 0,
-  automaticFuel: 0,
   totalExpenses: 0,
   net: 0,
-  totalKm: 0,
-  premiumActive: false,
+  km: 0,
+  earningPerKm: null,
+  chartData: [],
+  projection: null,
+  recentActivity: [],
 };
 
 export function DashboardPage() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
-  const { settings } = usePublicAppSettings();
+  const navigate = useNavigate();
 
-  const initialRange = useMemo(() => getCurrentMonthRange(), []);
-  const [startDate, setStartDate] = useState(initialRange.startDate);
-  const [endDate, setEndDate] = useState(initialRange.endDate);
+  const isPremium = isPremiumProfile(profile);
+
+  const now = useMemo(() => dayjs(), []);
+  const [startDate, setStartDate] = useState(
+    now.startOf("month").format("YYYY-MM-DD")
+  );
+  const [endDate, setEndDate] = useState(
+    now.endOf("month").format("YYYY-MM-DD")
+  );
 
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<SecureDashboardSummary>(emptySummary);
+  const [data, setData] = useState<DashboardData>(emptyDashboardData);
+
+  const loadDashboard = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+
+      const result = await dashboardService.getDashboardData(
+        user.id,
+        startDate,
+        endDate,
+        isPremium
+      );
+
+      setData(result);
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar("Erro ao carregar dashboard", {
+        variant: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let cancelled = false;
+    loadDashboard();
+  }, [user, startDate, endDate, isPremium]);
 
-    const load = async () => {
-      try {
-        setLoading(true);
-        const data = await secureDashboardService.getSummary(startDate, endDate);
-
-        if (cancelled) return;
-        setSummary(data);
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) {
-          enqueueSnackbar("Erro ao carregar dashboard", {
-            variant: "error",
-          });
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [startDate, endDate, enqueueSnackbar]);
+  const firstName =
+    profile?.name?.split(" ")[0] || user?.email?.split("@")[0] || "parceiro";
 
   return (
     <PageContainer>
@@ -81,25 +90,32 @@ export function DashboardPage() {
           spacing={2}
         >
           <Stack spacing={0.5}>
-            <Typography variant="h4">
-              Olá, {profile?.name || "motorista"} 👋
-            </Typography>
+            <Typography variant="h4">Olá, {firstName} 👋</Typography>
             <Typography color="text.secondary">
-              Acompanhe seu desempenho financeiro no período selecionado.
+              Veja seu desempenho financeiro no período selecionado.
             </Typography>
           </Stack>
 
-          {!summary.premiumActive && settings.subscriptionMode.enabled ? (
-            <Button
-              component={RouterLink}
-              to="/subscription"
-              variant="contained"
-              color="success"
-            >
-              Assinar Premium
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Button variant="contained" onClick={() => navigate("/earnings")}>
+              Adicionar ganho
             </Button>
-          ) : null}
+
+            <Button variant="outlined" onClick={() => navigate("/expenses")}>
+              Adicionar gasto
+            </Button>
+          </Stack>
         </Stack>
+
+        {isPremium ? (
+          <Alert severity="success">
+            Sua conta premium libera projeção, ganho por KM e combustível automático.
+          </Alert>
+        ) : (
+          <Alert severity="info">
+            Projeção, ganho por KM, combustível automático e relatórios são recursos premium.
+          </Alert>
+        )}
 
         <DashboardFilters
           startDate={startDate}
@@ -111,69 +127,72 @@ export function DashboardPage() {
         {loading ? (
           <AppSkeleton />
         ) : (
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppCard>
-                <Typography variant="body2" color="text.secondary">
-                  Ganho bruto
-                </Typography>
-                <Typography variant="h5">{formatCurrency(summary.gross)}</Typography>
-              </AppCard>
-            </Grid>
+          <>
+            <DashboardMetricsCards
+              gross={data.gross}
+              totalExpenses={data.totalExpenses}
+              net={data.net}
+              km={data.km}
+              earningPerKm={data.earningPerKm}
+              isPremium={isPremium}
+            />
 
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppCard>
-                <Typography variant="body2" color="text.secondary">
-                  Total de gastos
-                </Typography>
-                <Typography variant="h5">
-                  {formatCurrency(summary.totalExpenses)}
-                </Typography>
-              </AppCard>
-            </Grid>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, lg: 8 }}>
+                <EarningsByDayChart data={data.chartData} />
+              </Grid>
 
-            <Grid size={{ xs: 12, md: 4 }}>
-              <AppCard>
-                <Typography variant="body2" color="text.secondary">
-                  Lucro líquido
-                </Typography>
-                <Typography
-                  variant="h5"
-                  color={summary.net >= 0 ? "success.main" : "error.main"}
-                >
-                  {formatCurrency(summary.net)}
-                </Typography>
-              </AppCard>
-            </Grid>
+              <Grid size={{ xs: 12, lg: 4 }}>
+                <RecentActivityCard items={data.recentActivity} />
+              </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppCard>
-                <Typography variant="body2" color="text.secondary">
-                  Gastos manuais
-                </Typography>
-                <Typography variant="h5">
-                  {formatCurrency(summary.manualExpenses)}
-                </Typography>
-              </AppCard>
-            </Grid>
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppCard>
+                  <Typography variant="body2" color="text.secondary">
+                    Projeção do mês
+                  </Typography>
 
-            <Grid size={{ xs: 12, md: 6 }}>
-              <AppCard>
-                <Typography variant="body2" color="text.secondary">
-                  Combustível automático
-                </Typography>
-                <Typography variant="h5">
-                  {summary.premiumActive
-                    ? formatCurrency(summary.automaticFuel)
-                    : "Premium"}
-                </Typography>
-              </AppCard>
-            </Grid>
+                  <Typography variant="h5" sx={{ mt: 1 }}>
+                    {isPremium && data.projection
+                      ? formatCurrency(data.projection)
+                      : "Premium"}
+                  </Typography>
 
-            <Grid size={{ xs: 12 }}>
-              <RecentActivityCard items={[]} />
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Disponível para usuários premium no mês atual completo.
+                  </Typography>
+                </AppCard>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <AppCard>
+                  <Typography variant="body2" color="text.secondary">
+                    Resultado do período
+                  </Typography>
+
+                  <Typography
+                    variant="h5"
+                    sx={{ mt: 1 }}
+                    color={data.net >= 0 ? "success.main" : "error.main"}
+                  >
+                    {formatCurrency(data.net)}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Lucro líquido = ganho bruto - gastos.
+                  </Typography>
+                </AppCard>
+              </Grid>
             </Grid>
-          </Grid>
+          </>
         )}
       </Stack>
     </PageContainer>
