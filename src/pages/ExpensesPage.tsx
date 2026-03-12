@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Pagination, Stack, Typography } from "@mui/material";
 
 import { PageContainer } from "../components/common/PageContainer";
+import { AppCard } from "../components/common/AppCard";
+import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { AdvancedMovementFilters } from "../components/common/AdvancedMovementFilters";
 import { useAuth } from "../app/providers/AuthProvider";
 import type { Expense, Earning } from "../types/database";
 import { expensesService } from "../features/expenses/expenses.service";
@@ -9,13 +12,11 @@ import { earningsService } from "../features/earnings/earnings.service";
 import { ExpensesToolbar } from "../features/expenses/components/ExpensesToolbar";
 import { ExpensesTable } from "../features/expenses/components/ExpensesTable";
 import { ExpensesFormDialog } from "../features/expenses/components/ExpensesFormDialog";
-import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import type { ExpenseFormData } from "../features/expenses/expenses.schemas";
 import {
   formatCurrency,
   getCurrentMonthRange,
 } from "../features/earnings/earnings.utils";
-import { AppCard } from "../components/common/AppCard";
 import { useSnackbar } from "notistack";
 import type { ExpenseListItem } from "../features/expenses/expenses.types";
 import { buildReconciledExpenseData } from "../features/expenses/expenses.utils";
@@ -25,6 +26,12 @@ import {
   getTotalPages,
   paginateArray,
 } from "../utils/pagination";
+import {
+  buildUniqueOptions,
+  emptyAdvancedMovementFilters,
+  filterExpenseItems,
+  type AdvancedMovementFilters as AdvancedMovementFiltersState,
+} from "../utils/movementFilters";
 
 export function ExpensesPage() {
   const { user, profile } = useAuth();
@@ -42,6 +49,10 @@ export function ExpensesPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [filters, setFilters] = useState<AdvancedMovementFiltersState>(
+    emptyAdvancedMovementFilters
+  );
 
   const [page, setPage] = useState(1);
 
@@ -79,16 +90,56 @@ export function ExpensesPage() {
     void loadData();
   }, [user, startDate, endDate]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
   const reconciled = useMemo(
     () => buildReconciledExpenseData(manualItems, earnings, isPremium && isDriverMode),
     [manualItems, earnings, isPremium, isDriverMode]
   );
 
-  const items = reconciled.items;
-  const manualTotal = reconciled.manualTotal;
-  const automaticFuelTotal = reconciled.automaticFuelTotal;
-  const compensatedFuelTotal = reconciled.compensatedFuelTotal;
-  const totalExpenses = reconciled.totalExpenses;
+  const categoryOptions = useMemo(
+    () => buildUniqueOptions(reconciled.items.map((item) => item.category)),
+    [reconciled.items]
+  );
+
+  const filteredItems = useMemo(
+    () => filterExpenseItems(reconciled.items, filters),
+    [reconciled.items, filters]
+  );
+
+  const manualTotal = useMemo(
+    () =>
+      filteredItems
+        .filter((item) => item.source === "manual")
+        .reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [filteredItems]
+  );
+
+  const automaticFuelTotal = useMemo(
+    () =>
+      filteredItems
+        .filter((item) => item.source === "automatic_fuel")
+        .reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [filteredItems]
+  );
+
+  const compensatedFuelTotal = useMemo(
+    () =>
+      filteredItems
+        .filter((item) => item.source === "manual")
+        .reduce(
+          (acc, item) => acc + Number(item.compensated_automatic_fuel_amount || 0),
+          0
+        ),
+    [filteredItems]
+  );
+
+  const totalExpenses = useMemo(
+    () => manualTotal + automaticFuelTotal,
+    [manualTotal, automaticFuelTotal]
+  );
 
   const pageSize = useMemo(
     () => getSmartListPageSize(startDate, endDate),
@@ -96,13 +147,13 @@ export function ExpensesPage() {
   );
 
   const totalPages = useMemo(
-    () => getTotalPages(items.length, pageSize),
-    [items.length, pageSize]
+    () => getTotalPages(filteredItems.length, pageSize),
+    [filteredItems.length, pageSize]
   );
 
   const paginatedItems = useMemo(
-    () => paginateArray(items, page, pageSize),
-    [items, page, pageSize]
+    () => paginateArray(filteredItems, page, pageSize),
+    [filteredItems, page, pageSize]
   );
 
   const handleCreate = () => {
@@ -193,28 +244,24 @@ export function ExpensesPage() {
           <Typography variant="h4">Gastos</Typography>
           <Typography color="text.secondary">
             {isDriverMode
-              ? "Cadastre seus custos e acompanhe seu resultado real."
-              : "Cadastre suas saídas e acompanhe seu fluxo financeiro com clareza."}
+              ? "Cadastre seus custos e use filtros avançados para encontrar qualquer movimentação."
+              : "Cadastre suas saídas e use filtros avançados para analisar seu fluxo financeiro."}
           </Typography>
         </Stack>
 
         {isDriverMode ? (
           isPremium ? (
             <Alert severity="success">
-              Sua conta premium permite calcular combustível automaticamente por
-              ganho e também compensar abastecimentos manuais para evitar
-              duplicidade no total.
+              Sua conta premium permite cálculo automático e compensação inteligente de combustível.
             </Alert>
           ) : (
             <Alert severity="info">
-              O cálculo automático e a compensação inteligente de combustível são
-              recursos premium.
+              O cálculo automático e a compensação inteligente de combustível são recursos premium.
             </Alert>
           )
         ) : (
           <Alert severity="info">
-            No modo controle financeiro essencial, os gastos são tratados como
-            saídas financeiras, sem cálculo operacional de combustível.
+            No modo essencial, os gastos são tratados como saídas financeiras com filtro avançado por texto, categoria e período.
           </Alert>
         )}
 
@@ -226,6 +273,14 @@ export function ExpensesPage() {
               onChangeStartDate={setStartDate}
               onChangeEndDate={setEndDate}
               onClickAdd={handleCreate}
+            />
+
+            <AdvancedMovementFilters
+              title="Filtro avançado de gastos"
+              categoryLabel="Categoria"
+              categoryOptions={categoryOptions}
+              value={filters}
+              onChange={setFilters}
             />
           </Stack>
         </AppCard>

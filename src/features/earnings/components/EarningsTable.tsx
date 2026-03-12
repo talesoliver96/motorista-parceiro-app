@@ -32,6 +32,7 @@ type Props = {
   items: Earning[];
   isPremium: boolean;
   appMode: AppMode;
+  netByEarningId?: Record<string, number>;
   onEdit: (item: Earning) => void;
   onDelete: (item: Earning) => void;
 };
@@ -53,6 +54,7 @@ export function EarningsTable({
   items,
   isPremium,
   appMode,
+  netByEarningId = {},
   onEdit,
   onDelete,
 }: Props) {
@@ -80,6 +82,7 @@ export function EarningsTable({
           const earningPerKm = getEarningPerKm(item);
           const earningPerHour = getEarningPerHour(item);
           const automaticFuel = getAutomaticFuelCost(item);
+          const net = Number(netByEarningId[item.id] ?? item.gross_amount ?? 0);
 
           return (
             <AppCard key={item.id}>
@@ -113,6 +116,14 @@ export function EarningsTable({
 
                 <Typography variant="h6">
                   {formatCurrency(item.gross_amount)}
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color={net >= 0 ? "success.main" : "error.main"}
+                >
+                  {isDriverMode ? "Líquido estimado" : "Entrada líquida estimada"}:{" "}
+                  {formatCurrency(net)}
                 </Typography>
 
                 {isDriverMode ? (
@@ -209,30 +220,38 @@ export function EarningsTable({
             <TableRow>
               <TableCell>Data</TableCell>
               <TableCell>Tipo</TableCell>
-              <TableCell>Valor</TableCell>
+              <TableCell>Bruto</TableCell>
+              <TableCell>Líquido estimado</TableCell>
               <TableCell>Observações</TableCell>
               <TableCell align="right">Ações</TableCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id} hover>
-                <TableCell>{formatDate(item.date)}</TableCell>
-                <TableCell>Entrada</TableCell>
-                <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
-                <TableCell>{item.notes || "-"}</TableCell>
-                <TableCell align="right">
-                  <IconButton onClick={() => onEdit(item)}>
-                    <EditRoundedIcon />
-                  </IconButton>
+            {items.map((item) => {
+              const net = Number(netByEarningId[item.id] ?? item.gross_amount ?? 0);
 
-                  <IconButton onClick={() => onDelete(item)} color="error">
-                    <DeleteRoundedIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
+              return (
+                <TableRow key={item.id} hover>
+                  <TableCell>{formatDate(item.date)}</TableCell>
+                  <TableCell>Entrada</TableCell>
+                  <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
+                  <TableCell sx={{ color: net >= 0 ? "success.main" : "error.main", fontWeight: 700 }}>
+                    {formatCurrency(net)}
+                  </TableCell>
+                  <TableCell>{item.notes || "-"}</TableCell>
+                  <TableCell align="right">
+                    <IconButton onClick={() => onEdit(item)}>
+                      <EditRoundedIcon />
+                    </IconButton>
+
+                    <IconButton onClick={() => onDelete(item)} color="error">
+                      <DeleteRoundedIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
@@ -248,6 +267,7 @@ export function EarningsTable({
             <TableCell>Plataforma</TableCell>
             <TableCell>Veículo</TableCell>
             <TableCell>Ganho bruto</TableCell>
+            <TableCell>Ganho líquido</TableCell>
             <TableCell>KM</TableCell>
             <TableCell>Ganho/KM</TableCell>
             <TableCell>Combustível automático</TableCell>
@@ -261,6 +281,7 @@ export function EarningsTable({
           {items.map((item) => {
             const earningPerKm = getEarningPerKm(item);
             const automaticFuel = getAutomaticFuelCost(item);
+            const net = Number(netByEarningId[item.id] ?? item.gross_amount ?? 0);
 
             return (
               <TableRow key={item.id} hover>
@@ -268,6 +289,9 @@ export function EarningsTable({
                 <TableCell>{item.platform || "-"}</TableCell>
                 <TableCell>{getVehicleLabel(item.vehicle_type)}</TableCell>
                 <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
+                <TableCell sx={{ color: net >= 0 ? "success.main" : "error.main", fontWeight: 700 }}>
+                  {formatCurrency(net)}
+                </TableCell>
                 <TableCell>{item.km_traveled ?? "-"}</TableCell>
                 <TableCell>
                   {isPremium && earningPerKm !== null

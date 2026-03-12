@@ -21,7 +21,6 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
 import WalletRoundedIcon from "@mui/icons-material/WalletRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
-import QueryStatsRoundedIcon from "@mui/icons-material/QueryStatsRounded";
 import LocalGasStationRoundedIcon from "@mui/icons-material/LocalGasStationRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import SavingsRoundedIcon from "@mui/icons-material/SavingsRounded";
@@ -32,6 +31,10 @@ import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import PaidRoundedIcon from "@mui/icons-material/PaidRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import BalanceRoundedIcon from "@mui/icons-material/BalanceRounded";
+import AutoGraphRoundedIcon from "@mui/icons-material/AutoGraphRounded";
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import { Link as RouterLink } from "react-router-dom";
 
 import { useAuth } from "../app/providers/AuthProvider";
@@ -54,26 +57,28 @@ function FeatureCard({ icon, title, description }: FeatureCardProps) {
         border: "1px solid",
         borderColor: "divider",
         bgcolor: "background.paper",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+        boxShadow: "0 16px 40px rgba(0,0,0,0.05)",
       }}
     >
       <Stack spacing={1.5}>
         <Box
           sx={{
-            width: 48,
-            height: 48,
-            borderRadius: 2.5,
+            width: 52,
+            height: 52,
+            borderRadius: 3,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.10),
             color: "primary.main",
           }}
         >
           {icon}
         </Box>
 
-        <Typography variant="h6">{title}</Typography>
+        <Typography variant="h6" fontWeight={700}>
+          {title}
+        </Typography>
 
         <Typography color="text.secondary">{description}</Typography>
       </Stack>
@@ -105,20 +110,20 @@ function AudienceCard({
         border: "1px solid",
         borderColor: "divider",
         bgcolor: "background.paper",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+        boxShadow: "0 16px 40px rgba(0,0,0,0.05)",
       }}
     >
       <Stack spacing={2}>
         <Stack direction="row" spacing={1.25} alignItems="center">
           <Box
             sx={{
-              width: 46,
-              height: 46,
-              borderRadius: 2.5,
+              width: 48,
+              height: 48,
+              borderRadius: 3,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.10),
               color: "primary.main",
             }}
           >
@@ -128,7 +133,10 @@ function AudienceCard({
           <Chip label={chip} color="primary" variant="outlined" size="small" />
         </Stack>
 
-        <Typography variant="h5">{title}</Typography>
+        <Typography variant="h5" fontWeight={800}>
+          {title}
+        </Typography>
+
         <Typography color="text.secondary">{description}</Typography>
 
         <Stack spacing={1}>
@@ -169,7 +177,7 @@ function MetricCard({ title, value, caption }: MetricCardProps) {
         {title}
       </Typography>
 
-      <Typography variant="h4" sx={{ mt: 0.5, fontWeight: 700 }}>
+      <Typography variant="h4" sx={{ mt: 0.5, fontWeight: 800 }}>
         {value}
       </Typography>
 
@@ -201,24 +209,42 @@ function StepCard({ number, title, description }: StepCardProps) {
       <Stack spacing={1.5}>
         <Box
           sx={{
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             bgcolor: "primary.main",
             color: "primary.contrastText",
-            fontWeight: 700,
+            fontWeight: 800,
           }}
         >
           {number}
         </Box>
 
-        <Typography variant="h6">{title}</Typography>
+        <Typography variant="h6" fontWeight={700}>
+          {title}
+        </Typography>
+
         <Typography color="text.secondary">{description}</Typography>
       </Stack>
     </Box>
+  );
+}
+
+type PlanFeatureProps = {
+  text: string;
+};
+
+function PlanFeature({ text }: PlanFeatureProps) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <CheckCircleRoundedIcon sx={{ color: "success.main", fontSize: 18 }} />
+      <Typography variant="body2" color="text.secondary">
+        {text}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -231,17 +257,17 @@ export function LandingPage() {
   const menuItems = useMemo(
     () => [
       { label: "Como funciona", href: "#como-funciona" },
-      { label: "Perfis de uso", href: "#perfis" },
+      { label: "Perfis", href: "#perfis" },
       { label: "Recursos", href: "#recursos" },
-      { label: "Premium", href: "#premium" },
+      { label: "Plano", href: "#plano" },
     ],
     []
   );
 
-  const NavLinks = (
+  const navLinks = (
     <Stack
       direction={{ xs: "column", md: "row" }}
-      spacing={{ xs: 1, md: 2 }}
+      spacing={{ xs: 1, md: 2.5 }}
       alignItems={{ xs: "stretch", md: "center" }}
     >
       {menuItems.map((item) => (
@@ -251,7 +277,7 @@ export function LandingPage() {
           underline="none"
           color="text.primary"
           sx={{
-            fontWeight: 500,
+            fontWeight: 600,
             py: { xs: 1, md: 0 },
           }}
           onClick={() => setMobileOpen(false)}
@@ -271,25 +297,26 @@ export function LandingPage() {
         sx={{
           borderBottom: "1px solid",
           borderColor: "divider",
-          bgcolor: alpha(theme.palette.background.paper, 0.88),
+          bgcolor: alpha(theme.palette.background.paper, 0.86),
           backdropFilter: "blur(12px)",
         }}
       >
         <Container maxWidth="lg">
-          <Toolbar disableGutters sx={{ minHeight: 76 }}>
+          <Toolbar disableGutters sx={{ minHeight: 78 }}>
             <Stack direction="row" spacing={1.25} alignItems="center" sx={{ flex: 1 }}>
               <Box
                 sx={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 2.5,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 3,
                   bgcolor: "primary.main",
                   color: "primary.contrastText",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontWeight: 800,
+                  fontWeight: 900,
                   fontSize: 18,
+                  boxShadow: "0 10px 24px rgba(25,118,210,0.35)",
                 }}
               >
                 MP
@@ -300,12 +327,12 @@ export function LandingPage() {
                   MotoristaParceiro
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Gestão para motoristas e controle financeiro essencial
+                  Gestão financeira inteligente
                 </Typography>
               </Box>
             </Stack>
 
-            <Box sx={{ display: { xs: "none", md: "block" } }}>{NavLinks}</Box>
+            <Box sx={{ display: { xs: "none", md: "block" } }}>{navLinks}</Box>
 
             <Stack
               direction="row"
@@ -318,7 +345,7 @@ export function LandingPage() {
               </Button>
 
               <Button component={RouterLink} to="/register" variant="contained">
-                Criar conta
+                Testar grátis
               </Button>
             </Stack>
 
@@ -348,7 +375,7 @@ export function LandingPage() {
         <Stack spacing={2}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="h6" fontWeight={700}>
-              Menu
+              Navegação
             </Typography>
 
             <IconButton onClick={() => setMobileOpen(false)}>
@@ -357,9 +384,7 @@ export function LandingPage() {
           </Stack>
 
           <Divider />
-
-          {NavLinks}
-
+          {navLinks}
           <Divider />
 
           <Stack spacing={1}>
@@ -373,7 +398,7 @@ export function LandingPage() {
               variant="contained"
               onClick={() => setMobileOpen(false)}
             >
-              Criar conta
+              Testar grátis
             </Button>
           </Stack>
         </Stack>
@@ -384,41 +409,46 @@ export function LandingPage() {
           position: "relative",
           overflow: "hidden",
           background:
-            "linear-gradient(180deg, rgba(25,118,210,0.06) 0%, rgba(25,118,210,0.00) 100%)",
+            "radial-gradient(circle at top left, rgba(25,118,210,0.14) 0%, rgba(25,118,210,0.04) 28%, rgba(25,118,210,0) 56%)",
         }}
       >
-        <Container maxWidth="lg" sx={{ py: { xs: 7, md: 10 } }}>
+        <Container maxWidth="lg" sx={{ py: { xs: 7, md: 11 } }}>
           <Grid container spacing={5} alignItems="center">
             <Grid size={{ xs: 12, md: 6 }}>
               <Stack spacing={2.5}>
                 <Chip
-                  label="30 dias grátis para testar a plataforma"
-                  color="success"
+                  icon={<StarRoundedIcon />}
+                  label="Sistema gratuito + 30 dias grátis de Premium para testar"
+                  color="warning"
                   variant="outlined"
-                  sx={{ width: "fit-content", fontWeight: 600 }}
+                  sx={{ width: "fit-content", fontWeight: 700 }}
                 />
 
                 <Typography
                   variant="h1"
                   sx={{
-                    fontSize: { xs: 38, md: 60 },
-                    lineHeight: 1.05,
-                    fontWeight: 800,
-                    letterSpacing: "-0.03em",
+                    fontSize: { xs: 40, md: 64 },
+                    lineHeight: 1.02,
+                    fontWeight: 900,
+                    letterSpacing: "-0.04em",
+                    maxWidth: 760,
                   }}
                 >
-                  Controle seu dinheiro com mais clareza, precisão e visão de negócio.
+                  Pare de adivinhar seus números.
+                  <Box component="span" sx={{ color: "primary.main", display: "block" }}>
+                    Comece a entender seu resultado real.
+                  </Box>
                 </Typography>
 
                 <Typography
                   variant="h6"
                   color="text.secondary"
-                  sx={{ fontWeight: 400, maxWidth: 640 }}
+                  sx={{ fontWeight: 400, maxWidth: 650 }}
                 >
-                  O MotoristaParceiro ajuda motoristas de aplicativo e usuários de
-                  controle financeiro essencial a entender entradas, gastos, saldo,
-                  lucro real e desempenho do período em uma plataforma moderna,
-                  prática e profissional.
+                  O MotoristaParceiro é uma plataforma moderna para organizar entradas,
+                  gastos, saldo, total disponível e desempenho do período — com uma
+                  experiência especializada para motoristas e outra focada em
+                  controle financeiro essencial.
                 </Typography>
 
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
@@ -429,7 +459,7 @@ export function LandingPage() {
                     size="large"
                     endIcon={<ArrowForwardRoundedIcon />}
                   >
-                    {user ? "Abrir meu painel" : "Começar teste grátis"}
+                    {user ? "Abrir meu painel" : "Criar conta grátis"}
                   </Button>
 
                   <Button
@@ -458,7 +488,7 @@ export function LandingPage() {
                   border: "1px solid",
                   borderColor: "divider",
                   bgcolor: "background.paper",
-                  boxShadow: "0 24px 80px rgba(0,0,0,0.08)",
+                  boxShadow: "0 28px 90px rgba(0,0,0,0.10)",
                 }}
               >
                 <Stack spacing={2.5}>
@@ -469,14 +499,14 @@ export function LandingPage() {
                   >
                     <Box>
                       <Typography variant="subtitle2" color="text.secondary">
-                        Visão geral do período
+                        Painel financeiro
                       </Typography>
-                      <Typography variant="h5" fontWeight={700}>
-                        Resultado financeiro
+                      <Typography variant="h5" fontWeight={800}>
+                        Visão geral do período
                       </Typography>
                     </Box>
 
-                    <Chip label="Exemplo" size="small" variant="outlined" />
+                    <Chip label="Demonstração" size="small" variant="outlined" />
                   </Stack>
 
                   <Grid container spacing={2}>
@@ -484,7 +514,7 @@ export function LandingPage() {
                       <MetricCard
                         title="Entradas"
                         value={formatCurrency(5480)}
-                        caption="Movimentação bruta registrada"
+                        caption="Movimentação registrada"
                       />
                     </Grid>
 
@@ -492,7 +522,7 @@ export function LandingPage() {
                       <MetricCard
                         title="Gastos"
                         value={formatCurrency(1820)}
-                        caption="Saídas consideradas no período"
+                        caption="Saídas consideradas"
                       />
                     </Grid>
 
@@ -500,7 +530,7 @@ export function LandingPage() {
                       <MetricCard
                         title="Resultado líquido"
                         value={formatCurrency(3660)}
-                        caption="Entradas menos gastos"
+                        caption="Entradas - gastos"
                       />
                     </Grid>
 
@@ -508,25 +538,28 @@ export function LandingPage() {
                       <MetricCard
                         title="Saldo disponível"
                         value={formatCurrency(4660)}
-                        caption="Carteira + resultado líquido"
+                        caption="Carteira + resultado"
                       />
                     </Grid>
                   </Grid>
 
                   <Box
                     sx={{
-                      p: 2,
+                      p: 2.5,
                       borderRadius: 3,
                       bgcolor: (theme) => alpha(theme.palette.primary.main, 0.06),
                       border: "1px dashed",
                       borderColor: "divider",
                     }}
                   >
-                    <Typography variant="body2" color="text.secondary">
-                      Uma única plataforma para acompanhar seu dinheiro com muito mais
-                      clareza — seja em uma rotina operacional de motorista ou em um
-                      uso financeiro mais simples e objetivo.
-                    </Typography>
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        O que você ganha com isso?
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Mais clareza, mais organização e muito menos decisão no escuro.
+                      </Typography>
+                    </Stack>
                   </Box>
                 </Stack>
               </Box>
@@ -535,14 +568,13 @@ export function LandingPage() {
         </Container>
       </Box>
 
-      <Container id="como-funciona" maxWidth="lg" sx={{ py: 8 }}>
+      <Container id="como-funciona" maxWidth="lg" sx={{ py: 9 }}>
         <Stack spacing={1} sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight={700}>
-            Como funciona
+          <Typography variant="h4" fontWeight={800}>
+            Como a plataforma funciona
           </Typography>
           <Typography color="text.secondary">
-            O objetivo do produto é transformar movimentação financeira em leitura
-            prática para decisão.
+            Um fluxo simples para organizar sua rotina e melhorar sua leitura financeira.
           </Typography>
         </Stack>
 
@@ -550,37 +582,45 @@ export function LandingPage() {
           <Grid size={{ xs: 12, md: 4 }}>
             <StepCard
               number="1"
-              title="Escolha sua experiência"
-              description="No cadastro, você define se quer usar a plataforma como motorista de app ou como controle financeiro essencial."
+              title="Crie sua conta grátis"
+              description="Você entra no sistema sem custo e escolhe a experiência que melhor se encaixa no seu perfil de uso."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
             <StepCard
               number="2"
-              title="Registre entradas e gastos"
-              description="Lance sua movimentação do jeito que fizer mais sentido para a sua rotina, com uma interface clara e organizada."
+              title="Registre sua movimentação"
+              description="Lance entradas, gastos, saldo e, no modo motorista, acompanhe também a parte operacional."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
             <StepCard
               number="3"
-              title="Acompanhe o resultado real"
-              description="Veja lucro líquido, saldo disponível, relatórios e indicadores para ter mais controle sobre o seu dinheiro."
+              title="Leia seu resultado real"
+              description="Use dashboard, relatórios e indicadores para enxergar com clareza o que está acontecendo com o seu dinheiro."
             />
           </Grid>
         </Grid>
       </Container>
 
-      <Box id="perfis" sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
-        <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Box
+        id="perfis"
+        sx={{
+          bgcolor: "background.paper",
+          borderTop: "1px solid",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 9 }}>
           <Stack spacing={1} sx={{ mb: 4 }}>
-            <Typography variant="h4" fontWeight={700}>
-              Dois perfis de uso, uma plataforma profissional
+            <Typography variant="h4" fontWeight={800}>
+              Dois perfis de uso. Uma base profissional.
             </Typography>
             <Typography color="text.secondary">
-              O sistema se adapta ao seu contexto sem virar uma bagunça visual.
+              A plataforma se adapta ao seu contexto sem ficar genérica demais.
             </Typography>
           </Stack>
 
@@ -590,12 +630,12 @@ export function LandingPage() {
                 icon={<DirectionsCarRoundedIcon />}
                 chip="Modo Driver"
                 title="Gestão para motoristas"
-                description="Ideal para motoristas de aplicativo que querem enxergar melhor a operação e o lucro real."
+                description="Ideal para motoristas de aplicativo que querem acompanhar operação, gastos, combustível e lucro real com mais profundidade."
                 bullets={[
                   "Ganhos e gastos por período",
-                  "KM rodado e leitura operacional",
+                  "KM rodado e indicadores operacionais",
                   "Combustível automático com compensação inteligente",
-                  "Relatórios premium para análise mais profunda",
+                  "Relatórios premium para leitura mais estratégica",
                 ]}
               />
             </Grid>
@@ -605,12 +645,12 @@ export function LandingPage() {
                 icon={<WalletRoundedIcon />}
                 chip="Modo Essential"
                 title="Controle financeiro essencial"
-                description="Perfeito para quem quer registrar entradas, saídas e saldo com uma experiência limpa e objetiva."
+                description="Perfeito para quem quer registrar entradas, saídas e saldo com uma experiência limpa, moderna e objetiva."
                 bullets={[
                   "Entradas e saídas organizadas",
                   "Saldo / carteira opcional",
-                  "Visão clara do total disponível",
-                  "Experiência simples, elegante e funcional",
+                  "Total disponível com leitura clara",
+                  "Experiência simples, elegante e prática",
                 ]}
               />
             </Grid>
@@ -618,13 +658,13 @@ export function LandingPage() {
         </Container>
       </Box>
 
-      <Container id="recursos" maxWidth="lg" sx={{ py: 8 }}>
+      <Container id="recursos" maxWidth="lg" sx={{ py: 9 }}>
         <Stack spacing={1} sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight={700}>
-            Recursos que ajudam você a decidir melhor
+          <Typography variant="h4" fontWeight={800}>
+            Recursos pensados para clareza e decisão
           </Typography>
           <Typography color="text.secondary">
-            Não é só registrar números. É entender o que eles significam.
+            Não é só lançar números. É conseguir interpretar o que eles mostram.
           </Typography>
         </Stack>
 
@@ -633,7 +673,7 @@ export function LandingPage() {
             <FeatureCard
               icon={<ReceiptLongRoundedIcon />}
               title="Entradas e gastos organizados"
-              description="Cadastre sua movimentação com praticidade e mantenha tudo centralizado em um só lugar."
+              description="Registre sua movimentação com praticidade e mantenha tudo centralizado em uma única plataforma."
             />
           </Grid>
 
@@ -641,7 +681,7 @@ export function LandingPage() {
             <FeatureCard
               icon={<SavingsRoundedIcon />}
               title="Saldo e total disponível"
-              description="Acompanhe não só o resultado do período, mas também quanto está disponível para o seu dia a dia."
+              description="Acompanhe não só o resultado do período, mas também quanto está disponível para uso real."
             />
           </Grid>
 
@@ -649,7 +689,7 @@ export function LandingPage() {
             <FeatureCard
               icon={<InsightsRoundedIcon />}
               title="Dashboard com leitura objetiva"
-              description="Veja rapidamente o que entrou, o que saiu, o que sobrou e onde está o impacto principal."
+              description="Veja rapidamente o que entrou, o que saiu e qual foi o resultado líquido do período."
             />
           </Grid>
 
@@ -657,72 +697,63 @@ export function LandingPage() {
             <FeatureCard
               icon={<LocalGasStationRoundedIcon />}
               title="Combustível automático"
-              description="No modo motorista, estime custo de combustível por ganho e compense abastecimentos manuais sem duplicidade."
+              description="No modo motorista, estime custo de combustível por ganho e evite duplicidade com compensação inteligente."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
             <FeatureCard
-              icon={<QueryStatsRoundedIcon />}
+              icon={<AutoGraphRoundedIcon />}
               title="Relatórios avançados"
-              description="Entenda melhor o comportamento financeiro do período com gráficos, indicadores e melhores resultados líquidos."
+              description="Use análises premium para aprofundar a leitura financeira e identificar melhores dias e padrões."
             />
           </Grid>
 
           <Grid size={{ xs: 12, md: 4 }}>
             <FeatureCard
               icon={<SecurityRoundedIcon />}
-              title="Estrutura profissional"
-              description="Usuários, assinatura, painel admin, configurações e organização para crescer o produto com mais segurança."
+              title="Estrutura de SaaS"
+              description="Usuários, painel admin, assinatura, configurações e organização para uma operação mais profissional."
             />
           </Grid>
         </Grid>
       </Container>
 
-      <Box id="premium" sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
-        <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Box
+        id="plano"
+        sx={{
+          bgcolor: "background.paper",
+          borderTop: "1px solid",
+          borderBottom: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 9 }}>
           <Grid container spacing={4} alignItems="center">
             <Grid size={{ xs: 12, md: 7 }}>
               <Stack spacing={2}>
                 <Chip
-                  icon={<StarRoundedIcon />}
-                  label="30 dias grátis para testar"
-                  color="warning"
+                  icon={<BoltRoundedIcon />}
+                  label="Gratuito para começar"
+                  color="success"
                   variant="outlined"
                   sx={{ width: "fit-content" }}
                 />
 
-                <Typography variant="h4" fontWeight={800}>
-                  Teste a plataforma por 30 dias e entenda se ela faz sentido para a sua rotina.
+                <Typography variant="h4" fontWeight={900}>
+                  Comece grátis. Evolua para o Premium quando quiser mais profundidade.
                 </Typography>
 
                 <Typography color="text.secondary">
-                  Você pode experimentar o produto, registrar sua movimentação e
-                  avaliar na prática o ganho de clareza e organização antes de tomar
-                  qualquer decisão.
+                  O sistema pode ser usado gratuitamente para organizar sua rotina
+                  financeira. Para quem quiser ir além, o Premium libera recursos mais
+                  avançados e ainda oferece <strong>30 dias grátis para teste</strong>.
                 </Typography>
 
-                <Stack spacing={1}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <CheckCircleRoundedIcon sx={{ color: "success.main", fontSize: 20 }} />
-                    <Typography color="text.secondary">
-                      Acesso inicial para conhecer a plataforma com calma
-                    </Typography>
-                  </Stack>
-
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <CheckCircleRoundedIcon sx={{ color: "success.main", fontSize: 20 }} />
-                    <Typography color="text.secondary">
-                      Recursos premium para aprofundar sua leitura financeira
-                    </Typography>
-                  </Stack>
-
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <CheckCircleRoundedIcon sx={{ color: "success.main", fontSize: 20 }} />
-                    <Typography color="text.secondary">
-                      Mais clareza para decidir sobre dinheiro, custos e resultado real
-                    </Typography>
-                  </Stack>
+                <Stack spacing={1.2}>
+                  <PlanFeature text="Uso gratuito para organizar entradas, gastos e saldo" />
+                  <PlanFeature text="Premium com relatórios avançados e recursos extras" />
+                  <PlanFeature text="30 dias grátis de Premium para testar a experiência completa" />
                 </Stack>
               </Stack>
             </Grid>
@@ -735,16 +766,18 @@ export function LandingPage() {
                   border: "1px solid",
                   borderColor: "divider",
                   bgcolor: "background.default",
+                  boxShadow: "0 18px 50px rgba(0,0,0,0.06)",
                 }}
               >
-                <Stack spacing={2}>
-                  <Typography variant="h5" fontWeight={700}>
-                    Premium
-                  </Typography>
-
-                  <Typography color="text.secondary">
-                    Ideal para quem quer uma leitura mais estratégica e recursos mais completos.
-                  </Typography>
+                <Stack spacing={2.5}>
+                  <Stack spacing={0.5}>
+                    <Typography variant="h5" fontWeight={800}>
+                      Premium
+                    </Typography>
+                    <Typography color="text.secondary">
+                      Para quem quer mais profundidade, leitura estratégica e automações.
+                    </Typography>
+                  </Stack>
 
                   <Divider />
 
@@ -763,7 +796,29 @@ export function LandingPage() {
                       <PaidRoundedIcon color="success" fontSize="small" />
                       <Typography variant="body2">Combustível automático no modo motorista</Typography>
                     </Stack>
+
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <BalanceRoundedIcon color="info" fontSize="small" />
+                      <Typography variant="body2">Leitura mais estratégica do período</Typography>
+                    </Stack>
                   </Stack>
+
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      bgcolor: (theme) => alpha(theme.palette.success.main, 0.08),
+                      border: "1px dashed",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={700}>
+                      30 dias grátis de Premium para testar
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Experimente os recursos avançados e avalie na prática o ganho de clareza.
+                    </Typography>
+                  </Box>
 
                   <Button
                     component={RouterLink}
@@ -771,12 +826,12 @@ export function LandingPage() {
                     variant="contained"
                     size="large"
                   >
-                    {user ? "Abrir painel" : "Começar meu teste"}
+                    {user ? "Abrir painel" : "Começar grátis"}
                   </Button>
 
                   {settings.subscriptionMode.enabled ? (
                     <Button component={RouterLink} to="/subscription">
-                      Ver detalhes da assinatura
+                      Ver detalhes do Premium
                     </Button>
                   ) : null}
                 </Stack>
@@ -786,13 +841,13 @@ export function LandingPage() {
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Container maxWidth="lg" sx={{ py: 9 }}>
         <Box
           sx={{
             p: { xs: 3, md: 5 },
             borderRadius: 5,
             background:
-              "linear-gradient(135deg, rgba(25,118,210,0.10) 0%, rgba(25,118,210,0.03) 100%)",
+              "linear-gradient(135deg, rgba(25,118,210,0.12) 0%, rgba(25,118,210,0.04) 100%)",
             border: "1px solid",
             borderColor: "divider",
           }}
@@ -800,13 +855,21 @@ export function LandingPage() {
           <Grid container spacing={3} alignItems="center">
             <Grid size={{ xs: 12, md: 8 }}>
               <Stack spacing={1.5}>
-                <Typography variant="h4" fontWeight={800}>
-                  Chega de controlar tudo no escuro.
+                <Chip
+                  icon={<VerifiedRoundedIcon />}
+                  label="Mais organização, mais clareza, mais controle"
+                  color="primary"
+                  variant="outlined"
+                  sx={{ width: "fit-content" }}
+                />
+
+                <Typography variant="h4" fontWeight={900}>
+                  Uma plataforma para transformar movimentação em leitura real.
                 </Typography>
 
                 <Typography color="text.secondary">
-                  Organize sua rotina financeira, acompanhe seu resultado real e use
-                  uma plataforma com aparência e estrutura muito mais profissional.
+                  Use gratuitamente, teste o Premium por 30 dias e descubra se o
+                  MotoristaParceiro faz sentido para sua rotina financeira.
                 </Typography>
               </Stack>
             </Grid>
@@ -815,7 +878,6 @@ export function LandingPage() {
               <Stack
                 direction={{ xs: "column", sm: "row", md: "column" }}
                 spacing={1.5}
-                alignItems={{ xs: "stretch", md: "stretch" }}
               >
                 <Button
                   component={RouterLink}
@@ -823,7 +885,7 @@ export function LandingPage() {
                   variant="contained"
                   size="large"
                 >
-                  {user ? "Ir para o painel" : "Criar minha conta"}
+                  {user ? "Ir para o painel" : "Criar conta grátis"}
                 </Button>
 
                 <Button component={RouterLink} to="/login" variant="outlined" size="large">
@@ -851,14 +913,14 @@ export function LandingPage() {
             alignItems={{ xs: "flex-start", md: "center" }}
           >
             <Box>
-              <Typography fontWeight={700}>MotoristaParceiro</Typography>
+              <Typography fontWeight={800}>MotoristaParceiro</Typography>
               <Typography variant="body2" color="text.secondary">
                 Gestão para motoristas e controle financeiro essencial.
               </Typography>
             </Box>
 
             <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-              <Link component={RouterLink} to="/contact-public" underline="hover">
+              <Link component={RouterLink} to="/public/contact" underline="hover">
                 Contato
               </Link>
               <Link component={RouterLink} to="/terms" underline="hover">

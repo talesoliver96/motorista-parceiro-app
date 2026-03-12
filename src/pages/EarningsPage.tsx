@@ -5,13 +5,15 @@ import { useSnackbar } from "notistack";
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
+import { AdvancedMovementFilters } from "../components/common/AdvancedMovementFilters";
 import { useAuth } from "../app/providers/AuthProvider";
 import { isPremiumProfile } from "../features/premium/premium.utils";
 import { earningsService } from "../features/earnings/earnings.service";
+import { expensesService } from "../features/expenses/expenses.service";
 import { EarningsToolbar } from "../features/earnings/components/EarningsToolbar";
 import { EarningsTable } from "../features/earnings/components/EarningsTable";
 import { EarningsFormDialog } from "../features/earnings/components/EarningsFormDialog";
-import type { Earning } from "../types/database";
+import type { Earning, Expense } from "../types/database";
 import type { EarningFormValues } from "../features/earnings/earnings.schemas";
 import {
   formatCurrency,
@@ -23,6 +25,15 @@ import {
   getTotalPages,
   paginateArray,
 } from "../utils/pagination";
+import { buildReconciledExpenseData } from "../features/expenses/expenses.utils";
+import {
+  buildNetByEarningId,
+  buildUniqueOptions,
+  emptyAdvancedMovementFilters,
+  filterEarnings,
+  filterExpenseItems,
+  type AdvancedMovementFilters as AdvancedMovementFiltersState,
+} from "../utils/movementFilters";
 
 export function EarningsPage() {
   const { user, profile } = useAuth();
@@ -36,8 +47,13 @@ export function EarningsPage() {
   const [endDate, setEndDate] = useState(initialRange.endDate);
 
   const [items, setItems] = useState<Earning[]>([]);
+  const [manualExpenses, setManualExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [filters, setFilters] = useState<AdvancedMovementFiltersState>(
+    emptyAdvancedMovementFilters
+  );
 
   const [page, setPage] = useState(1);
 
@@ -52,8 +68,14 @@ export function EarningsPage() {
 
     try {
       setLoading(true);
-      const data = await earningsService.listByPeriod(user.id, startDate, endDate);
-      setItems(data);
+
+      const [earningsData, expensesData] = await Promise.all([
+        earningsService.listByPeriod(user.id, startDate, endDate),
+        expensesService.listByPeriod(user.id, startDate, endDate),
+      ]);
+
+      setItems(earningsData);
+      setManualExpenses(expensesData);
     } catch (error) {
       console.error(error);
       enqueueSnackbar("Erro ao carregar ganhos", {
@@ -69,34 +91,78 @@ export function EarningsPage() {
     void loadData();
   }, [user, startDate, endDate]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
+  const categoryOptions = useMemo(() => {
+    return buildUniqueOptions([
+      ...items.map((item) => item.platform ?? ""),
+      ...items.map((item) => item.vehicle_type),
+    ]);
+  }, [items]);
+
+  const reconciledExpenses = useMemo(() => {
+    return buildReconciledExpenseData(manualExpenses, items, isPremium);
+  }, [manualExpenses, items, isPremium]);
+
+  const filteredItems = useMemo(
+    () => filterEarnings(items, filters),
+    [items, filters]
+  );
+
+  const filteredExpenseItems = useMemo(
+    () => filterExpenseItems(reconciledExpenses.items, filters),
+    [reconciledExpenses.items, filters]
+  );
+
+  const netByEarningId = useMemo(
+    () => buildNetByEarningId(filteredItems, filteredExpenseItems),
+    [filteredItems, filteredExpenseItems]
+  );
+
   const pageSize = useMemo(
     () => getSmartListPageSize(startDate, endDate),
     [startDate, endDate]
   );
 
   const totalPages = useMemo(
-    () => getTotalPages(items.length, pageSize),
-    [items.length, pageSize]
+    () => getTotalPages(filteredItems.length, pageSize),
+    [filteredItems.length, pageSize]
   );
 
   const paginatedItems = useMemo(
-    () => paginateArray(items, page, pageSize),
-    [items, page, pageSize]
+    () => paginateArray(filteredItems, page, pageSize),
+    [filteredItems, page, pageSize]
   );
 
   const totalGross = useMemo(
-    () => items.reduce((acc, item) => acc + Number(item.gross_amount || 0), 0),
-    [items]
+    () => filteredItems.reduce((acc, item) => acc + Number(item.gross_amount || 0), 0),
+    [filteredItems]
+  );
+
+  const totalNet = useMemo(
+    () =>
+      filteredItems.reduce(
+        (acc, item) => acc + Number(netByEarningId[item.id] ?? item.gross_amount ?? 0),
+        0
+      ),
+    [filteredItems, netByEarningId]
+  );
+
+  const totalKm = useMemo(
+    () => filteredItems.reduce((acc, item) => acc + Number(item.km_traveled || 0), 0),
+    [filteredItems]
   );
 
   const totalAutomaticFuel = useMemo(() => {
     if (!isPremium || !isDriverMode) return 0;
 
-    return items.reduce((acc, item) => {
+    return filteredItems.reduce((acc, item) => {
       const value = getAutomaticFuelCost(item);
       return acc + Number(value || 0);
     }, 0);
-  }, [items, isPremium, isDriverMode]);
+  }, [filteredItems, isPremium, isDriverMode]);
 
   const handleCreate = () => {
     setSelectedItem(null);
@@ -125,9 +191,7 @@ export function EarningsPage() {
           isDriverMode
             ? "Ganho atualizado com sucesso"
             : "Entrada atualizada com sucesso",
-          {
-            variant: "success",
-          }
+          { variant: "success" }
         );
       } else {
         await earningsService.create(user.id, values);
@@ -135,9 +199,7 @@ export function EarningsPage() {
           isDriverMode
             ? "Ganho cadastrado com sucesso"
             : "Entrada cadastrada com sucesso",
-          {
-            variant: "success",
-          }
+          { variant: "success" }
         );
       }
 
@@ -148,9 +210,7 @@ export function EarningsPage() {
       console.error(error);
       enqueueSnackbar(
         isDriverMode ? "Erro ao salvar ganho" : "Erro ao salvar entrada",
-        {
-          variant: "error",
-        }
+        { variant: "error" }
       );
     } finally {
       setSaving(false);
@@ -169,9 +229,7 @@ export function EarningsPage() {
         isDriverMode
           ? "Ganho excluído com sucesso"
           : "Entrada excluída com sucesso",
-        {
-          variant: "success",
-        }
+        { variant: "success" }
       );
 
       setDeleteOpen(false);
@@ -181,9 +239,7 @@ export function EarningsPage() {
       console.error(error);
       enqueueSnackbar(
         isDriverMode ? "Erro ao excluir ganho" : "Erro ao excluir entrada",
-        {
-          variant: "error",
-        }
+        { variant: "error" }
       );
     } finally {
       setSaving(false);
@@ -199,26 +255,24 @@ export function EarningsPage() {
           </Typography>
           <Typography color="text.secondary">
             {isDriverMode
-              ? "Registre seus ganhos e acompanhe sua operação com mais precisão."
-              : "Registre suas entradas financeiras e acompanhe sua evolução com clareza."}
+              ? "Registre seus ganhos e acompanhe o desempenho bruto e líquido do período."
+              : "Registre suas entradas e acompanhe o resultado bruto e líquido do período."}
           </Typography>
         </Stack>
 
         {isDriverMode ? (
           isPremium ? (
             <Alert severity="success">
-              Sua conta premium permite ativar o cálculo automático de combustível
-              por ganho, usando KM, consumo e preço informado.
+              Sua conta premium libera cálculo automático de combustível e indicadores operacionais mais completos.
             </Alert>
           ) : (
             <Alert severity="info">
-              O cálculo automático de combustível por ganho é um recurso premium.
+              Cálculos por KM, por hora e combustível automático estão disponíveis no plano premium.
             </Alert>
           )
         ) : (
           <Alert severity="info">
-            No modo controle financeiro essencial, esta tela registra entradas sem
-            dados operacionais de motorista.
+            Nesta tela você acompanha entradas brutas e o valor líquido estimado considerando os gastos do mesmo dia.
           </Alert>
         )}
 
@@ -231,15 +285,44 @@ export function EarningsPage() {
               onChangeEndDate={setEndDate}
               onClickAdd={handleCreate}
             />
+
+            <AdvancedMovementFilters
+              title="Filtro avançado de ganhos"
+              categoryLabel={isDriverMode ? "Plataforma / origem" : "Origem"}
+              categoryOptions={categoryOptions}
+              value={filters}
+              onChange={setFilters}
+            />
           </Stack>
         </AppCard>
 
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <AppCard sx={{ flex: 1 }}>
             <Typography variant="body2" color="text.secondary">
-              {isDriverMode ? "Ganho bruto no período" : "Entradas no período"}
+              {isDriverMode ? "Ganho bruto do período" : "Entradas brutas"}
             </Typography>
             <Typography variant="h5">{formatCurrency(totalGross)}</Typography>
+          </AppCard>
+
+          <AppCard sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {isDriverMode ? "Ganho líquido do período" : "Resultado líquido estimado"}
+            </Typography>
+            <Typography
+              variant="h5"
+              color={totalNet >= 0 ? "success.main" : "error.main"}
+            >
+              {formatCurrency(totalNet)}
+            </Typography>
+          </AppCard>
+
+          <AppCard sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {isDriverMode ? "KM total do período" : "Movimentações filtradas"}
+            </Typography>
+            <Typography variant="h5">
+              {isDriverMode ? (totalKm > 0 ? totalKm.toFixed(2) : "-") : filteredItems.length}
+            </Typography>
           </AppCard>
 
           {isDriverMode ? (
@@ -264,6 +347,7 @@ export function EarningsPage() {
               items={paginatedItems}
               isPremium={isPremium}
               appMode={appMode}
+              netByEarningId={netByEarningId}
               onEdit={handleEdit}
               onDelete={handleDeleteRequest}
             />

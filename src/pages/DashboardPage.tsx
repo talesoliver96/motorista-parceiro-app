@@ -7,16 +7,13 @@ import { useSnackbar } from "notistack";
 import { PageContainer } from "../components/common/PageContainer";
 import { AppCard } from "../components/common/AppCard";
 import { AppSkeleton } from "../components/common/AppSkeleton";
+import { AdvancedMovementFilters } from "../components/common/AdvancedMovementFilters";
 import { useAuth } from "../app/providers/AuthProvider";
 
 import {
   dashboardService,
   type DashboardData,
 } from "../features/dashboard/dashboard.service";
-import {
-  secureDashboardService,
-  type SecureDashboardSummary,
-} from "../features/dashboard/secure-dashboard.service";
 import { DashboardFilters } from "../features/dashboard/components/DashboardFilters";
 import { DashboardMetricsCards } from "../features/dashboard/components/DashboardMetricsCards";
 import { EarningsByDayChart } from "../features/dashboard/components/EarningsByDayChart";
@@ -24,6 +21,14 @@ import { RecentActivityCard } from "../features/dashboard/components/RecentActiv
 import { formatCurrency } from "../features/earnings/earnings.utils";
 import { isPremiumProfile } from "../features/premium/premium.utils";
 import { usePublicAppSettings } from "../features/app-settings/usePublicAppSettings";
+import { getRecentActivity, groupEarningsByDay } from "../features/dashboard/dashboard.utils";
+import {
+  buildUniqueOptions,
+  emptyAdvancedMovementFilters,
+  filterEarnings,
+  filterExpenseItems,
+  type AdvancedMovementFilters as AdvancedMovementFiltersState,
+} from "../utils/movementFilters";
 
 const emptyDashboardData: DashboardData = {
   earnings: [],
@@ -36,16 +41,6 @@ const emptyDashboardData: DashboardData = {
   chartData: [],
   projection: null,
   recentActivity: [],
-};
-
-const emptySummary: SecureDashboardSummary = {
-  gross: 0,
-  manualExpenses: 0,
-  automaticFuel: 0,
-  totalExpenses: 0,
-  net: 0,
-  totalKm: 0,
-  premiumActive: false,
 };
 
 export function DashboardPage() {
@@ -68,8 +63,11 @@ export function DashboardPage() {
     now.endOf("month").format("YYYY-MM-DD")
   );
 
+  const [filters, setFilters] = useState<AdvancedMovementFiltersState>(
+    emptyAdvancedMovementFilters
+  );
+
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<SecureDashboardSummary>(emptySummary);
   const [details, setDetails] = useState<DashboardData>(emptyDashboardData);
 
   useEffect(() => {
@@ -78,7 +76,6 @@ export function DashboardPage() {
     const loadDashboard = async () => {
       if (!user) {
         if (!cancelled) {
-          setSummary(emptySummary);
           setDetails(emptyDashboardData);
           setLoading(false);
         }
@@ -88,46 +85,19 @@ export function DashboardPage() {
       try {
         setLoading(true);
 
-        const [summaryResult, detailsResult] = await Promise.allSettled([
-          secureDashboardService.getSummary(startDate, endDate),
-          dashboardService.getDashboardData(
-            user.id,
-            startDate,
-            endDate,
-            profilePremium
-          ),
-        ]);
+        const result = await dashboardService.getDashboardData(
+          user.id,
+          startDate,
+          endDate,
+          profilePremium
+        );
 
         if (cancelled) return;
-
-        let hasError = false;
-
-        if (summaryResult.status === "fulfilled") {
-          setSummary(summaryResult.value);
-        } else {
-          hasError = true;
-          setSummary(emptySummary);
-          console.error(summaryResult.reason);
-        }
-
-        if (detailsResult.status === "fulfilled") {
-          setDetails(detailsResult.value);
-        } else {
-          hasError = true;
-          setDetails(emptyDashboardData);
-          console.error(detailsResult.reason);
-        }
-
-        if (hasError) {
-          enqueueSnackbar("Parte dos dados do dashboard não pôde ser carregada.", {
-            variant: "warning",
-          });
-        }
+        setDetails(result);
       } catch (error) {
         console.error(error);
 
         if (!cancelled) {
-          setSummary(emptySummary);
           setDetails(emptyDashboardData);
 
           enqueueSnackbar("Erro ao carregar dashboard", {
@@ -148,15 +118,78 @@ export function DashboardPage() {
     };
   }, [user, startDate, endDate, profilePremium, enqueueSnackbar]);
 
+  const categoryOptions = useMemo(() => {
+    return buildUniqueOptions([
+      ...details.earnings.map((item) => item.platform ?? ""),
+      ...details.expenses.map((item) => item.category),
+    ]);
+  }, [details]);
+
+  const filteredEarnings = useMemo(
+    () => filterEarnings(details.earnings, filters),
+    [details.earnings, filters]
+  );
+
+  const filteredExpenses = useMemo(
+    () => filterExpenseItems(details.expenses, filters),
+    [details.expenses, filters]
+  );
+
+  const displayGross = useMemo(
+    () => filteredEarnings.reduce((acc, item) => acc + Number(item.gross_amount || 0), 0),
+    [filteredEarnings]
+  );
+
+  const displayExpenses = useMemo(
+    () => filteredExpenses.reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [filteredExpenses]
+  );
+
+  const displayNet = useMemo(
+    () => displayGross - displayExpenses,
+    [displayGross, displayExpenses]
+  );
+
+  const displayKm = useMemo(
+    () => filteredEarnings.reduce((acc, item) => acc + Number(item.km_traveled || 0), 0),
+    [filteredEarnings]
+  );
+
+  const earningPerKm = useMemo(() => {
+    if (!isDriverMode || !profilePremium || displayKm <= 0) return null;
+    return displayGross / displayKm;
+  }, [isDriverMode, profilePremium, displayGross, displayKm]);
+
+  const chartData = useMemo(
+    () => groupEarningsByDay(filteredEarnings),
+    [filteredEarnings]
+  );
+
+  const recentActivity = useMemo(
+    () => getRecentActivity(filteredEarnings, filteredExpenses),
+    [filteredEarnings, filteredExpenses]
+  );
+
+  const automaticFuelFiltered = useMemo(
+    () =>
+      filteredExpenses
+        .filter((item) => item.source === "automatic_fuel")
+        .reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [filteredExpenses]
+  );
+
+  const manualExpensesFiltered = useMemo(
+    () =>
+      filteredExpenses
+        .filter((item) => item.source === "manual")
+        .reduce((acc, item) => acc + Number(item.amount || 0), 0),
+    [filteredExpenses]
+  );
+
+  const totalAvailable = walletEnabled ? walletBalance + displayNet : displayNet;
+
   const firstName =
     profile?.name?.split(" ")[0] || user?.email?.split("@")[0] || "parceiro";
-
-  const premiumActive = summary.premiumActive || profilePremium;
-  const earningPerKm =
-    premiumActive && isDriverMode && summary.totalKm > 0
-      ? summary.gross / summary.totalKm
-      : null;
-  const totalAvailable = walletEnabled ? walletBalance + summary.net : summary.net;
 
   return (
     <PageContainer>
@@ -171,13 +204,13 @@ export function DashboardPage() {
             <Typography variant="h4">Olá, {firstName} 👋</Typography>
             <Typography color="text.secondary">
               {isDriverMode
-                ? "Veja seu desempenho financeiro no período selecionado."
-                : "Acompanhe seu resultado financeiro de forma simples e objetiva."}
+                ? "Veja seu desempenho financeiro com filtros avançados e leitura mais precisa."
+                : "Acompanhe seu resultado financeiro com filtros avançados e visão clara do período."}
             </Typography>
           </Stack>
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            {!premiumActive && settings.subscriptionMode.enabled ? (
+            {!profilePremium && settings.subscriptionMode.enabled ? (
               <Button
                 component={RouterLink}
                 to="/subscription"
@@ -199,55 +232,61 @@ export function DashboardPage() {
         </Stack>
 
         {isDriverMode ? (
-          premiumActive ? (
+          profilePremium ? (
             <Alert severity="success">
-              Sua conta premium libera projeção, ganho por KM, combustível automático
-              por ganho e compensação inteligente com abastecimentos manuais.
+              Sua conta premium libera projeção, ganho por KM, combustível automático e leitura operacional mais avançada.
             </Alert>
           ) : (
             <Alert severity="info">
-              Projeção, ganho por KM, combustível automático e compensação inteligente
-              são recursos premium.
+              Projeção, ganho por KM e combustível automático são recursos premium.
             </Alert>
           )
         ) : (
           <Alert severity="info">
-            Você está usando a experiência de controle financeiro essencial, com foco
-            em entradas, gastos, saldo e total disponível.
+            Você está usando a experiência essencial, com foco em entradas, gastos, saldo e total disponível.
           </Alert>
         )}
 
-        <DashboardFilters
-          startDate={startDate}
-          endDate={endDate}
-          onChangeStartDate={setStartDate}
-          onChangeEndDate={setEndDate}
-        />
+        <AppCard>
+          <Stack spacing={2}>
+            <DashboardFilters
+              startDate={startDate}
+              endDate={endDate}
+              onChangeStartDate={setStartDate}
+              onChangeEndDate={setEndDate}
+            />
+
+            <AdvancedMovementFilters
+              title="Filtro avançado do dashboard"
+              categoryLabel="Categoria / origem"
+              categoryOptions={categoryOptions}
+              value={filters}
+              onChange={setFilters}
+            />
+          </Stack>
+        </AppCard>
 
         {loading ? (
           <AppSkeleton />
         ) : (
           <>
             <DashboardMetricsCards
-              gross={summary.gross}
-              totalExpenses={summary.totalExpenses}
-              net={summary.net}
-              km={isDriverMode ? summary.totalKm : 0}
+              gross={displayGross}
+              totalExpenses={displayExpenses}
+              net={displayNet}
+              km={isDriverMode ? displayKm : 0}
               earningPerKm={isDriverMode ? earningPerKm : null}
-              isPremium={premiumActive && isDriverMode}
+              isPremium={profilePremium && isDriverMode}
               appMode={appMode}
             />
 
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, lg: 8 }}>
-                <EarningsByDayChart data={details.chartData} appMode={appMode} />
+                <EarningsByDayChart data={chartData} appMode={appMode} />
               </Grid>
 
               <Grid size={{ xs: 12, lg: 4 }}>
-                <RecentActivityCard
-                  items={details.recentActivity}
-                  appMode={appMode}
-                />
+                <RecentActivityCard items={recentActivity} appMode={appMode} />
               </Grid>
 
               <Grid size={{ xs: 12, md: 4 }}>
@@ -257,17 +296,13 @@ export function DashboardPage() {
                   </Typography>
 
                   <Typography variant="h5" sx={{ mt: 1 }}>
-                    {formatCurrency(summary.manualExpenses)}
+                    {formatCurrency(manualExpensesFiltered)}
                   </Typography>
 
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                     {isDriverMode
-                      ? "Já considera a compensação de abastecimentos manuais quando aplicável."
-                      : "Representa os gastos registrados no período selecionado."}
+                      ? "Inclui os gastos manuais do recorte filtrado."
+                      : "Representa as saídas registradas no recorte filtrado."}
                   </Typography>
                 </AppCard>
               </Grid>
@@ -280,17 +315,11 @@ export function DashboardPage() {
                     </Typography>
 
                     <Typography variant="h5" sx={{ mt: 1 }}>
-                      {premiumActive
-                        ? formatCurrency(summary.automaticFuel)
-                        : "Premium"}
+                      {profilePremium ? formatCurrency(automaticFuelFiltered) : "Premium"}
                     </Typography>
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1 }}
-                    >
-                      Representa apenas o valor automático ainda não compensado por abastecimentos manuais.
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Valor automático restante dentro do filtro atual.
                     </Typography>
                   </AppCard>
                 </Grid>
@@ -305,19 +334,15 @@ export function DashboardPage() {
                   <Typography
                     variant="h5"
                     sx={{ mt: 1 }}
-                    color={summary.net >= 0 ? "success.main" : "error.main"}
+                    color={displayNet >= 0 ? "success.main" : "error.main"}
                   >
-                    {formatCurrency(summary.net)}
+                    {formatCurrency(displayNet)}
                   </Typography>
 
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                     {isDriverMode
-                      ? "Lucro líquido = ganho bruto - gastos considerados do período."
-                      : "Resultado líquido = entradas - gastos considerados do período."}
+                      ? "Lucro líquido filtrado = ganhos filtrados - gastos filtrados."
+                      : "Resultado líquido filtrado = entradas filtradas - saídas filtradas."}
                   </Typography>
                 </AppCard>
               </Grid>
@@ -333,11 +358,7 @@ export function DashboardPage() {
                       {formatCurrency(walletBalance)}
                     </Typography>
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1 }}
-                    >
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                       Valor disponível informado manualmente nas configurações.
                     </Typography>
                   </AppCard>
@@ -359,65 +380,12 @@ export function DashboardPage() {
                       {formatCurrency(totalAvailable)}
                     </Typography>
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 1 }}
-                    >
-                      Total disponível = saldo da carteira + resultado líquido do período.
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Total disponível = saldo da carteira + resultado filtrado.
                     </Typography>
                   </AppCard>
                 </Grid>
               ) : null}
-
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Projeção do mês
-                  </Typography>
-
-                  <Typography variant="h5" sx={{ mt: 1 }}>
-                    {premiumActive && isDriverMode && details.projection !== null
-                      ? formatCurrency(details.projection)
-                      : isDriverMode
-                      ? "Premium"
-                      : "-"}
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    {isDriverMode
-                      ? "Disponível para usuários premium no mês atual completo."
-                      : "A experiência essencial prioriza leitura simples do período atual."}
-                  </Typography>
-                </AppCard>
-              </Grid>
-
-              <Grid size={{ xs: 12, md: 6 }}>
-                <AppCard>
-                  <Typography variant="body2" color="text.secondary">
-                    Faixa selecionada
-                  </Typography>
-
-                  <Typography variant="h5" sx={{ mt: 1 }}>
-                    {dayjs(startDate).format("DD/MM/YYYY")} até{" "}
-                    {dayjs(endDate).format("DD/MM/YYYY")}
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 1 }}
-                  >
-                    {isDriverMode
-                      ? "Os indicadores acima usam resumo seguro e reconciliação de combustível do período selecionado."
-                      : "Os indicadores acima usam o resumo financeiro do período selecionado."}
-                  </Typography>
-                </AppCard>
-              </Grid>
             </Grid>
           </>
         )}
